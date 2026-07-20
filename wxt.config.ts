@@ -11,7 +11,7 @@ export default defineConfig({
     name: 'Acopilot4chrome',
     description: 'Ask an OpenAI-compatible endpoint about explicitly captured page text.',
     minimum_chrome_version: '116',
-    permissions: ['activeTab', 'contextMenus', 'scripting', 'sidePanel', 'storage'],
+    permissions: ['activeTab', 'contextMenus', 'scripting', 'sidePanel', 'storage', 'tabs'],
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: 'Open Acopilot4chrome',

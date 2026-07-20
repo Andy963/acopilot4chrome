@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
     <template v-else>
       <header class="app-header">
         <div>
-          <p>Acopilot4chrome</p>
+          <p>Acopilot</p>
           <span>{{ profileStore.profile.value?.name ?? 'No agent configured' }}</span>
         </div>
         <button type="button" aria-label="Open Agent settings" @click="settingsVisible = true">
@@ -419,7 +419,7 @@ summary:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.8rem 1rem;
+  padding: 0.4rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface-raised);
 }

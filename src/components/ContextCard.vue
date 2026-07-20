@@ -5,8 +5,6 @@ import type { ContextItem } from '../context/types'
 
 const props = defineProps<{
   item: ContextItem
-  nextRequestStatus: 'included' | 'truncated' | 'omitted'
-  nextRequestText: string | null
 }>()
 
 defineEmits<{
@@ -21,22 +19,6 @@ const sourceUrl = computed(() => {
     return undefined
   }
 })
-
-const characterLabel = computed(() => new Intl.NumberFormat().format(props.item.originalCharCount))
-
-const nextRequestCharacterLabel = computed(() =>
-  props.nextRequestText === null
-    ? null
-    : new Intl.NumberFormat().format(props.nextRequestText.length),
-)
-
-const nextRequestStatusLabels = {
-  included: 'Included in next request',
-  truncated: 'Truncated by total limit',
-  omitted: 'Omitted by total limit',
-} as const
-
-const nextRequestStatusLabel = computed(() => nextRequestStatusLabels[props.nextRequestStatus])
 </script>
 
 <template>
@@ -66,35 +48,9 @@ const nextRequestStatusLabel = computed(() => nextRequestStatusLabels[props.next
     </a>
     <span v-else class="source" :title="item.url">{{ item.url }}</span>
 
-    <div class="metadata">
-      <span>{{ characterLabel }} original characters</span>
-      <span v-if="item.truncated" class="warning">Saved text truncated</span>
-    </div>
-
-    <div class="request-metadata">
-      <span
-        class="request-status"
-        :class="`request-status--${nextRequestStatus}`"
-        :aria-label="`Next request status: ${nextRequestStatusLabel}`"
-      >
-        {{ nextRequestStatusLabel }}
-      </span>
-      <span v-if="nextRequestCharacterLabel !== null" class="request-character-count">
-        {{ nextRequestCharacterLabel }} characters
-      </span>
-    </div>
-
-    <details>
-      <summary>Preview saved text</summary>
+    <details class="context-preview">
+      <summary>Preview selected context</summary>
       <pre>{{ item.text }}</pre>
-    </details>
-
-    <details class="request-preview" :open="nextRequestStatus !== 'included'">
-      <summary>Preview next request text</summary>
-      <pre v-if="nextRequestText !== null">{{ nextRequestText }}</pre>
-      <p v-else class="no-request-text">
-        No text from this card will be included in the next request.
-      </p>
     </details>
   </article>
 </template>
@@ -102,15 +58,13 @@ const nextRequestStatusLabel = computed(() => nextRequestStatusLabels[props.next
 <style scoped>
 .context-card {
   min-width: 14rem;
-  padding: 0.75rem;
+  padding: 0.65rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--surface-raised);
 }
 
-header,
-.metadata,
-.request-metadata {
+header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -126,14 +80,14 @@ header,
 }
 
 .icon-button {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
 .icon-button:hover,
@@ -144,8 +98,8 @@ header,
 
 h3 {
   overflow: hidden;
-  margin: 0.45rem 0 0.2rem;
-  font-size: 0.9rem;
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.88rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -154,7 +108,7 @@ h3 {
   display: block;
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -163,71 +117,28 @@ a.source:hover {
   color: var(--accent);
 }
 
-.metadata {
-  margin-top: 0.65rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.warning {
-  color: var(--warning);
-  font-weight: 700;
-}
-
-.request-metadata {
-  align-items: flex-start;
-  margin-top: 0.55rem;
-}
-
-.request-status {
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.request-status--included {
-  color: var(--success);
-}
-
-.request-status--truncated,
-.request-status--omitted {
-  color: var(--warning);
-}
-
-.request-character-count {
-  color: var(--muted);
-  font-size: 0.72rem;
-  white-space: nowrap;
-}
-
-details {
-  margin-top: 0.65rem;
+.context-preview {
+  margin-top: 0.5rem;
   border-top: 1px solid var(--border);
-  padding-top: 0.55rem;
+  padding-top: 0.45rem;
 }
 
 summary {
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
 }
 
 pre {
   overflow: auto;
   max-height: 12rem;
-  margin: 0.65rem 0 0;
-  padding: 0.65rem;
+  margin: 0.55rem 0 0;
+  padding: 0.6rem;
   border-radius: 0.5rem;
   background: var(--surface);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.5;
   white-space: pre-wrap;
-}
-
-.no-request-text {
-  margin: 0.65rem 0 0;
-  color: var(--warning);
-  font-size: 0.75rem;
-  line-height: 1.45;
 }
 </style>

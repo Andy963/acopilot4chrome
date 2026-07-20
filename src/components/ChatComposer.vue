@@ -32,34 +32,64 @@ function handleKeydown(event: KeyboardEvent): void {
 
 <template>
   <form class="composer" @submit.prevent="send">
-    <label for="question">Ask about the captured context</label>
-    <textarea
-      id="question"
-      ref="input"
-      v-model="question"
-      rows="3"
-      placeholder="Ask a question…"
-      :disabled="disabled"
-      @keydown="handleKeydown"
-    />
-    <div class="composer-footer">
-      <span>Enter to send · Shift+Enter for a new line</span>
-      <button v-if="active" class="cancel" type="button" @click="$emit('cancel')">Cancel</button>
-      <button v-else type="submit" :disabled="disabled || !question.trim()">Send</button>
+    <label for="question" class="sr-only">Ask about the captured context</label>
+    <div class="composer-box">
+      <textarea
+        id="question"
+        ref="input"
+        v-model="question"
+        rows="3"
+        :disabled="disabled"
+        @keydown="handleKeydown"
+      />
+      <div v-if="!question" class="placeholder" aria-hidden="true">
+        <span class="placeholder__title">Ask a question…</span>
+        <span class="placeholder__hint">Enter to send · Shift+Enter for a new line</span>
+      </div>
+      <button
+        v-if="active"
+        class="send send--cancel"
+        type="button"
+        aria-label="Cancel"
+        @click="$emit('cancel')"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+        </svg>
+      </button>
+      <button
+        v-else
+        class="send"
+        type="submit"
+        :disabled="disabled || !question.trim()"
+        aria-label="Send"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+      </button>
     </div>
   </form>
 </template>
 
 <style scoped>
 .composer {
-  display: grid;
-  gap: 0.45rem;
-  padding: 0.85rem 1rem 1rem;
+  padding: 0.6rem 0.85rem 0.8rem;
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
-label {
+.sr-only {
   position: absolute;
   overflow: hidden;
   width: 1px;
@@ -68,16 +98,21 @@ label {
   white-space: nowrap;
 }
 
+.composer-box {
+  position: relative;
+}
+
 textarea {
+  display: block;
   width: 100%;
-  min-height: 4.5rem;
+  min-height: 4.25rem;
   max-height: 11rem;
   box-sizing: border-box;
   resize: vertical;
   border: 1px solid var(--border-strong);
   border-radius: 0.75rem;
   outline: none;
-  padding: 0.75rem;
+  padding: 0.65rem 3rem 0.65rem 0.75rem;
   background: var(--surface-raised);
   color: var(--text);
   font: inherit;
@@ -89,39 +124,48 @@ textarea:focus {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.composer-footer {
+.placeholder {
+  position: absolute;
+  top: 0.65rem;
+  right: 3rem;
+  left: 0.78rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  pointer-events: none;
 }
 
-span {
+.placeholder__title {
   color: var(--muted);
-  font-size: 0.68rem;
 }
 
-button {
-  min-width: 4.5rem;
-  padding: 0.55rem 0.9rem;
-  border: 1px solid var(--accent);
-  border-radius: 0.55rem;
+.placeholder__hint {
+  color: var(--muted);
+  font-size: 0.66rem;
+  opacity: 0.8;
+}
+
+.send {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: none;
+  border-radius: 50%;
   background: var(--accent);
   color: var(--accent-contrast);
   cursor: pointer;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
 }
 
-button:disabled {
+.send:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
-.cancel {
-  border-color: var(--danger);
-  background: transparent;
-  color: var(--danger);
+.send--cancel {
+  background: var(--danger);
 }
 </style>

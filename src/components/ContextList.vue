@@ -71,10 +71,7 @@ const totalLimitWarning = computed(() => {
 <template>
   <section class="context-section" aria-labelledby="context-heading">
     <div class="section-heading">
-      <div>
-        <p class="eyebrow">Explicit snapshots</p>
-        <h2 id="context-heading">Page context</h2>
-      </div>
+      <h2 id="context-heading">Page context</h2>
       <button v-if="items.length" class="text-button" type="button" @click="$emit('clear')">
         Clear all
       </button>
@@ -94,15 +91,13 @@ const totalLimitWarning = computed(() => {
       it.
     </p>
     <p v-if="items.length && totalLimitAffectsRequest" class="limit-warning" role="status">
-      {{ totalLimitWarning }} Inspect each affected card's next-request preview before sending.
+      {{ totalLimitWarning }}
     </p>
     <div v-if="items.length" class="context-list">
       <ContextCard
-        v-for="entry in requestProjection"
-        :key="entry.item.id"
-        :item="entry.item"
-        :next-request-status="entry.nextRequestStatus"
-        :next-request-text="entry.nextRequestText"
+        v-for="item in items"
+        :key="item.id"
+        :item="item"
         @remove="$emit('remove', $event)"
       />
     </div>
@@ -112,8 +107,8 @@ const totalLimitWarning = computed(() => {
 <style scoped>
 .context-section {
   display: grid;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -126,35 +121,25 @@ const totalLimitWarning = computed(() => {
   gap: 0.75rem;
 }
 
-.eyebrow,
 h2,
 .empty-copy,
 .limit-warning {
   margin: 0;
 }
 
-.eyebrow {
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 h2 {
-  margin-top: 0.1rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 button {
-  padding: 0.55rem 0.7rem;
+  padding: 0.35rem 0.6rem;
   border: 1px solid var(--border-strong);
-  border-radius: 0.55rem;
+  border-radius: 0.5rem;
   background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 650;
 }
 
@@ -181,8 +166,8 @@ button:disabled {
 
 .empty-copy {
   color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .limit-warning {
