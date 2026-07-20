@@ -1,8 +1,6 @@
 import type { AgentProfile } from './adapter'
 import { AgentAdapterError } from './errors'
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-
 export function validateBaseUrl(input: string): URL {
   let url: URL
 
@@ -16,12 +14,8 @@ export function validateBaseUrl(input: string): URL {
     throw new AgentAdapterError('INVALID_CONFIG', 'Base URL must not contain credentials.', false)
   }
 
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopbackHost(url.hostname))) {
-    throw new AgentAdapterError(
-      'INVALID_CONFIG',
-      'Base URL must use HTTPS, except for loopback HTTP endpoints.',
-      false,
-    )
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new AgentAdapterError('INVALID_CONFIG', 'Base URL must use HTTP or HTTPS.', false)
   }
 
   if (url.search || url.hash) {
@@ -109,10 +103,6 @@ export function validateAgentProfile(profile: AgentProfile): void {
       false,
     )
   }
-}
-
-function isLoopbackHost(hostname: string): boolean {
-  return LOOPBACK_HOSTS.has(hostname.toLowerCase())
 }
 
 function isParentTraversalSegment(segment: string): boolean {

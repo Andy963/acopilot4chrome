@@ -9,7 +9,6 @@ export interface PermissionsApi {
 export type EndpointPermissionErrorCode =
   | 'INVALID_URL'
   | 'UNSUPPORTED_PROTOCOL'
-  | 'INSECURE_ENDPOINT'
   | 'PERMISSION_DENIED'
 
 export interface EndpointPermissionError {
@@ -38,11 +37,7 @@ export function getEndpointOriginPattern(baseUrl: string): EndpointPermissionRes
   }
 
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    return failure('UNSUPPORTED_PROTOCOL', 'The endpoint must use HTTPS or loopback HTTP.')
-  }
-
-  if (url.protocol === 'http:' && !isLoopbackHost(url.hostname)) {
-    return failure('INSECURE_ENDPOINT', 'HTTP endpoints are only allowed on loopback hosts.')
+    return failure('UNSUPPORTED_PROTOCOL', 'The endpoint must use HTTP or HTTPS.')
   }
 
   return { ok: true, originPattern: `${url.origin}/*`, alreadyGranted: false }
@@ -107,16 +102,6 @@ export async function removeEndpointPermissionIfUnused(
   } catch {
     return failure('PERMISSION_DENIED', 'Permission to access the endpoint could not be removed.')
   }
-}
-
-function isLoopbackHost(hostname: string): boolean {
-  const normalized = hostname.toLowerCase()
-  return (
-    normalized === 'localhost' ||
-    normalized === '127.0.0.1' ||
-    normalized === '::1' ||
-    normalized === '[::1]'
-  )
 }
 
 function failure(

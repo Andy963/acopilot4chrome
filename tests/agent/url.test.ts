@@ -17,16 +17,22 @@ describe('agent endpoint URL handling', () => {
     expect(buildChatCompletionsUrl(baseUrl, chatPath).href).toBe(expected)
   })
 
-  it.each(['http://example.com/v1', 'ftp://example.com/v1'])('rejects unsafe URL %s', (url) => {
+  it.each(['ftp://example.com/v1', 'ws://example.com/v1'])('rejects non-HTTP(S) URL %s', (url) => {
     expect(() => validateBaseUrl(url)).toThrow(AgentAdapterError)
   })
 
-  it.each(['http://localhost:11434/v1', 'http://127.0.0.1/v1', 'http://[::1]/v1'])(
-    'allows loopback HTTP URL %s',
-    (url) => {
-      expect(validateBaseUrl(url).href).toBe(url)
-    },
-  )
+  it.each([
+    'https://example.com/v1',
+    'http://localhost:11434/v1',
+    'http://127.0.0.1/v1',
+    'http://[::1]/v1',
+    'http://192.168.1.10:8080/v1',
+    'http://llm-server:8080/v1',
+    'http://ai.corp.internal/v1',
+    'http://8.8.8.8/v1',
+  ])('allows any HTTP or HTTPS URL %s', (url) => {
+    expect(validateBaseUrl(url).href).toBe(url)
+  })
 
   it('rejects credentials in the base URL', () => {
     expect(() => validateBaseUrl('https://user:password@example.com/v1')).toThrow(

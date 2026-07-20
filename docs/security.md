@@ -2,7 +2,7 @@
 
 ## Endpoint policy
 
-Endpoints must use HTTPS. HTTP is allowed only for `localhost`, `127.0.0.1`, and `[::1]`. Endpoint URLs containing credentials are rejected, and chat paths must be relative without traversal segments.
+Endpoints may use HTTPS or HTTP. HTTP is permitted for any host so intranet and self-hosted deployments work; note that HTTP sends the API key in cleartext, so use it only on trusted networks. Endpoint URLs containing credentials are rejected, and chat paths must be relative without traversal segments.
 
 Endpoint origins are requested as optional host permissions only when the user saves or tests a profile. The extension does not request permanent access to every website.
 

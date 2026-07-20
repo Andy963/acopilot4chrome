@@ -16,11 +16,14 @@ describe('endpoint permissions', () => {
     })
   })
 
-  it('allows loopback HTTP and rejects remote HTTP', () => {
+  it('allows HTTP and HTTPS endpoints, rejects other protocols', () => {
     expect(getEndpointOriginPattern('http://127.0.0.1:8080/v1').ok).toBe(true)
-    expect(getEndpointOriginPattern('http://example.com/v1')).toMatchObject({
+    expect(getEndpointOriginPattern('http://llm-server:8080/v1').ok).toBe(true)
+    expect(getEndpointOriginPattern('http://example.com/v1').ok).toBe(true)
+    expect(getEndpointOriginPattern('https://example.com/v1').ok).toBe(true)
+    expect(getEndpointOriginPattern('ftp://example.com/v1')).toMatchObject({
       ok: false,
-      error: { code: 'INSECURE_ENDPOINT' },
+      error: { code: 'UNSUPPORTED_PROTOCOL' },
     })
   })
 

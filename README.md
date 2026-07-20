@@ -11,9 +11,17 @@ Acopilot4chrome is a Chrome 116+ side-panel extension that sends only user-selec
 - Stream Markdown responses, cancel active requests, and restore the active browser-session conversation.
 - Keep API keys session-only by default, with an explicit local persistence option.
 
+## Install
+
+Download the latest `acopilot4chrome-<version>-chrome.zip` from the [Releases](https://github.com/Andy963/acopilot4chrome/releases) page and unzip it. Then in Chrome:
+
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Click **Load unpacked** and select the unzipped folder.
+3. Click the extension action to open the side panel, then set your Base URL and API key in Settings.
+
 ## Development
 
-Requirements: Node.js 22 and pnpm 11.
+Requirements: Node.js 24 and pnpm 11.
 
 ```bash
 corepack pnpm install
@@ -23,7 +31,7 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-Load `.output/chrome-mv3` as an unpacked extension in Chrome. Click the extension action to open the side panel.
+The build output is written to `.output/chrome-mv3`; load that folder as an unpacked extension for local development.
 
 See [Testing](docs/testing.md) for automated release suites and the manual Chrome Side Panel smoke checklist.
 

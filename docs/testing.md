@@ -4,7 +4,7 @@ The release checks use two layers: automated Vitest suites for deterministic mod
 
 ## Automated checks
 
-Run the focused release suites with Node.js 22 and pnpm 11:
+Run the focused release suites with Node.js 24 and pnpm 11:
 
 ```bash
 corepack pnpm test:integration
