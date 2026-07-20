@@ -18,6 +18,7 @@ import {
   removeEndpointPermissionIfUnused,
 } from '../../src/permissions/endpoint-permission'
 import { createId } from '../../src/shared/ids'
+import { PreferencesRepository } from '../../src/storage/preferences'
 import { ProfileRepository } from '../../src/storage/profile-repository'
 import { SecretRepository } from '../../src/storage/secret-repository'
 import { SessionRepository } from '../../src/storage/session-repository'
@@ -31,7 +32,10 @@ import {
 } from '../../src/stores/profiles'
 
 const secrets = new SecretRepository(chrome.storage.session, chrome.storage.local)
-const profiles = new ProfileRepository(chrome.storage.local, secrets)
+const preferences = new PreferencesRepository(chrome.storage.local)
+const profiles = new ProfileRepository(chrome.storage.local, chrome.storage.sync, secrets, () =>
+  preferences.getSyncEnabled(),
+)
 const sessions = new SessionRepository(chrome.storage.session)
 const adapter = new OpenAICompatibleAdapter()
 
@@ -39,6 +43,7 @@ const settingsVisible = ref(false)
 const restoring = ref(true)
 const appError = ref<string | null>(null)
 const messageList = ref<HTMLElement>()
+const syncEnabled = ref(false)
 
 let sessionId = createId()
 let sessionCreatedAt = Date.now()
@@ -83,6 +88,11 @@ const profileStore = createProfileStore({
     await profiles.delete(profile.id)
     const remaining = await profiles.list()
     await removeEndpointPermissionIfUnused(profile.baseUrl, remaining, chrome.permissions)
+  },
+  async updateActiveModel(profile, model) {
+    const updated: AgentProfile = { ...profile, model }
+    await profiles.save(updated)
+    return updated
   },
 })
 
@@ -131,6 +141,7 @@ async function restore(): Promise<void> {
   restoring.value = true
   appError.value = null
   try {
+    syncEnabled.value = await preferences.getSyncEnabled()
     await profileStore.restore()
     const session = await sessions.loadActiveSession()
     const activeProfileId = profileStore.profile.value?.id
@@ -207,18 +218,33 @@ async function deleteProfile(): Promise<void> {
   }
 }
 
+async function setSync(enabled: boolean): Promise<void> {
+  if (enabled === syncEnabled.value) return
+  try {
+    await profiles.mirror(enabled)
+    await preferences.setSyncEnabled(enabled)
+    syncEnabled.value = enabled
+    await restore()
+  } catch (error) {
+    appError.value = safeErrorMessage(error, 'Unable to change the sync setting.')
+  }
+}
+
 function buildProfile(
   current: AgentProfile | null,
   draft: AgentProfileDraft,
   updatedAt: number,
 ): AgentProfile {
+  const models = draft.models
+  const activeModel = current?.model && models.includes(current.model) ? current.model : models[0]
   return {
     id: current?.id ?? createId(),
     name: draft.name,
     adapter: 'openai-compatible',
     baseUrl: draft.baseUrl,
     chatPath: draft.chatPath,
-    ...(draft.model ? { model: draft.model } : {}),
+    models,
+    ...(activeModel ? { model: activeModel } : {}),
     authHeader: draft.authHeader,
     ...(draft.authScheme ? { authScheme: draft.authScheme } : {}),
     apiKeyStorageMode: draft.apiKeyStorageMode,
@@ -277,10 +303,12 @@ onBeforeUnmount(() => {
       :busy="profileStore.state.busy"
       :connection-status="profileStore.state.connectionStatus"
       :connection-message="profileStore.state.connectionMessage ?? undefined"
+      :sync-enabled="syncEnabled"
       @close="profileStore.profile.value && (settingsVisible = false)"
       @delete="deleteProfile"
       @save="saveSettings"
       @test="profileStore.test"
+      @toggle-sync="setSync"
     />
 
     <template v-else>
@@ -289,9 +317,28 @@ onBeforeUnmount(() => {
           <p>Acopilot</p>
           <span>{{ profileStore.profile.value?.name ?? 'No agent configured' }}</span>
         </div>
-        <button type="button" aria-label="Open Agent settings" @click="settingsVisible = true">
-          Settings
-        </button>
+        <div class="header-actions">
+          <select
+            v-if="(profileStore.profile.value?.models?.length ?? 0) > 1"
+            class="model-select"
+            :value="
+              profileStore.profile.value?.model ?? profileStore.profile.value?.models?.[0] ?? ''
+            "
+            aria-label="Active model"
+            @change="profileStore.selectModel(($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="model in profileStore.profile.value?.models ?? []"
+              :key="model"
+              :value="model"
+            >
+              {{ model }}
+            </option>
+          </select>
+          <button type="button" aria-label="Open Agent settings" @click="settingsVisible = true">
+            Settings
+          </button>
+        </div>
       </header>
 
       <div v-if="combinedError" class="banner banner--error" role="alert">
@@ -448,6 +495,24 @@ summary:focus-visible {
   cursor: pointer;
   font: inherit;
   font-size: 0.75rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.model-select {
+  max-width: 8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
 }
 
 .banner {

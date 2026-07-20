@@ -16,6 +16,7 @@ function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
     adapter: 'openai-compatible',
     baseUrl: 'https://example.com/v1',
     chatPath: 'chat/completions',
+    models: ['example-model'],
     model: 'example-model',
     authHeader: 'Authorization',
     authScheme: 'Bearer',

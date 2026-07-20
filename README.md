@@ -7,9 +7,10 @@ Acopilot4chrome is a Chrome 116+ side-panel extension that sends only user-selec
 - Capture selected text from the context menu or the side panel.
 - Extract readable text from the current page on explicit request.
 - Review, preview, remove, and clear context snapshots before sending, including exact next-request truncation or omission caused by the total context limit.
-- Configure an OpenAI-compatible base URL, API key, and optional model. Requests use `Authorization: Bearer <key>` and the standard `chat/completions` path automatically.
+- Configure an OpenAI-compatible base URL, API key, and one or more model names (switch the active model from the side-panel header). Requests use `Authorization: Bearer <key>` and the standard `chat/completions` path automatically.
 - Stream Markdown responses, cancel active requests, and restore the active browser-session conversation.
 - Keep API keys session-only by default, with an explicit local persistence option.
+- Optionally sync your settings (base URL, models, system instruction — never the API key) across Chrome via your Google account. Off by default; turning it off changes nothing else.
 
 ## Install
 

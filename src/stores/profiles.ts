@@ -6,7 +6,7 @@ export interface AgentProfileDraft {
   name: string
   baseUrl: string
   chatPath: string
-  model?: string
+  models: string[]
   authHeader: string
   authScheme?: string
   apiKeyStorageMode: ApiKeyStorageMode
@@ -30,6 +30,7 @@ export interface ProfileStoreDependencies {
   ): Promise<AgentProfile>
   testConnection(current: AgentProfile | null, submission: AgentSettingsSubmission): Promise<void>
   deleteProfile(profile: AgentProfile): Promise<void>
+  updateActiveModel(profile: AgentProfile, model: string): Promise<AgentProfile>
 }
 
 export function createProfileStore(dependencies: ProfileStoreDependencies) {
@@ -111,6 +112,16 @@ export function createProfileStore(dependencies: ProfileStoreDependencies) {
     }
   }
 
+  async function selectModel(model: string): Promise<void> {
+    const current = profile.value
+    if (!current || current.model === model) return
+    try {
+      profile.value = await dependencies.updateActiveModel(current, model)
+    } catch (error) {
+      state.error = safeErrorMessage(error, 'Unable to switch the model.')
+    }
+  }
+
   return {
     profile: readonly(profile),
     state: readonly(state),
@@ -118,6 +129,7 @@ export function createProfileStore(dependencies: ProfileStoreDependencies) {
     save,
     test,
     remove,
+    selectModel,
   }
 }
 

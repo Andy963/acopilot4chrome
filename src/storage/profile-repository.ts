@@ -8,11 +8,18 @@ export const ACTIVE_PROFILE_ID_STORAGE_KEY = 'activeProfileId'
 export class ProfileRepository {
   constructor(
     private readonly localStorage: StorageArea,
+    private readonly syncStorage: StorageArea,
     private readonly secrets: SecretRepository,
+    private readonly isSyncEnabled: () => Promise<boolean> = async () => false,
   ) {}
 
+  private async store(): Promise<StorageArea> {
+    return (await this.isSyncEnabled()) ? this.syncStorage : this.localStorage
+  }
+
   async list(): Promise<AgentProfile[]> {
-    const values = await this.localStorage.get(PROFILES_STORAGE_KEY)
+    const store = await this.store()
+    const values = await store.get(PROFILES_STORAGE_KEY)
     const stored = values[PROFILES_STORAGE_KEY]
     if (!Array.isArray(stored)) {
       return []
@@ -27,6 +34,7 @@ export class ProfileRepository {
   }
 
   async save(profile: AgentProfile): Promise<void> {
+    const store = await this.store()
     const profiles = await this.list()
     const safeProfile = sanitizeProfile(profile)
     const index = profiles.findIndex((candidate) => candidate.id === profile.id)
@@ -37,34 +45,58 @@ export class ProfileRepository {
       profiles[index] = safeProfile
     }
 
-    await this.localStorage.set({ [PROFILES_STORAGE_KEY]: profiles })
+    await store.set({ [PROFILES_STORAGE_KEY]: profiles })
   }
 
   async delete(profileId: string): Promise<void> {
+    const store = await this.store()
     const profiles = await this.list()
     const remaining = profiles.filter((profile) => profile.id !== profileId)
 
     await this.secrets.delete(profileId)
-    await this.localStorage.set({ [PROFILES_STORAGE_KEY]: remaining })
+    await store.set({ [PROFILES_STORAGE_KEY]: remaining })
 
     if ((await this.getActiveProfileId()) === profileId) {
-      await this.localStorage.remove(ACTIVE_PROFILE_ID_STORAGE_KEY)
+      await store.remove(ACTIVE_PROFILE_ID_STORAGE_KEY)
     }
   }
 
   async getActiveProfileId(): Promise<string | null> {
-    const values = await this.localStorage.get(ACTIVE_PROFILE_ID_STORAGE_KEY)
+    const store = await this.store()
+    const values = await store.get(ACTIVE_PROFILE_ID_STORAGE_KEY)
     const value = values[ACTIVE_PROFILE_ID_STORAGE_KEY]
     return typeof value === 'string' ? value : null
   }
 
   async setActiveProfileId(profileId: string | null): Promise<void> {
+    const store = await this.store()
     if (profileId === null) {
-      await this.localStorage.remove(ACTIVE_PROFILE_ID_STORAGE_KEY)
+      await store.remove(ACTIVE_PROFILE_ID_STORAGE_KEY)
       return
     }
 
-    await this.localStorage.set({ [ACTIVE_PROFILE_ID_STORAGE_KEY]: profileId })
+    await store.set({ [ACTIVE_PROFILE_ID_STORAGE_KEY]: profileId })
+  }
+
+  /**
+   * Copy profiles and the active selection between the local and sync stores.
+   * Called just before flipping the sync preference so the target store is
+   * seeded with the current configuration. API keys are never touched here.
+   */
+  async mirror(toSync: boolean): Promise<void> {
+    const from = toSync ? this.localStorage : this.syncStorage
+    const to = toSync ? this.syncStorage : this.localStorage
+    const values = await from.get([PROFILES_STORAGE_KEY, ACTIVE_PROFILE_ID_STORAGE_KEY])
+
+    const profiles = values[PROFILES_STORAGE_KEY]
+    if (Array.isArray(profiles)) {
+      await to.set({ [PROFILES_STORAGE_KEY]: profiles.filter(isAgentProfile).map(sanitizeProfile) })
+    }
+
+    const active = values[ACTIVE_PROFILE_ID_STORAGE_KEY]
+    if (typeof active === 'string') {
+      await to.set({ [ACTIVE_PROFILE_ID_STORAGE_KEY]: active })
+    }
   }
 }
 
@@ -91,7 +123,26 @@ function isAgentProfile(value: unknown): value is AgentProfile {
 }
 
 function sanitizeProfile(profile: AgentProfile): AgentProfile {
-  const safeProfile = { ...profile } as AgentProfile & { apiKey?: unknown }
-  delete safeProfile.apiKey
-  return safeProfile
+  const working: Record<string, unknown> = { ...profile }
+  delete working.apiKey
+
+  // Normalize the model list and migrate legacy single-model profiles.
+  const rawModels = working.models
+  const models = Array.isArray(rawModels)
+    ? rawModels.filter((model): model is string => typeof model === 'string' && model !== '')
+    : typeof working.model === 'string' && working.model !== ''
+      ? [working.model]
+      : []
+  working.models = models
+
+  // Keep the active model valid against the list.
+  const active =
+    typeof working.model === 'string' && models.includes(working.model) ? working.model : models[0]
+  if (active === undefined) {
+    delete working.model
+  } else {
+    working.model = active
+  }
+
+  return working as unknown as AgentProfile
 }

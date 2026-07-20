@@ -13,6 +13,7 @@ const profile: AgentProfile = {
   adapter: 'openai-compatible',
   baseUrl: 'https://agent.example/v1',
   chatPath: 'chat/completions',
+  models: ['integration-model'],
   model: 'integration-model',
   authHeader: 'Authorization',
   authScheme: 'Bearer',

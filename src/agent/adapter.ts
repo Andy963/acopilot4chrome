@@ -9,6 +9,7 @@ export interface AgentProfile {
   adapter: AgentAdapterType
   baseUrl: string
   chatPath: string
+  models: readonly string[]
   model?: string
   authHeader: string
   authScheme?: string

@@ -9,6 +9,7 @@ const props = defineProps<{
   busy: boolean
   connectionStatus: 'idle' | 'success' | 'error'
   connectionMessage: string | undefined
+  syncEnabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   delete: []
   save: [submission: AgentSettingsSubmission]
   test: [submission: AgentSettingsSubmission]
+  toggleSync: [enabled: boolean]
 }>()
 
 function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
@@ -23,7 +25,7 @@ function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
     name: profile?.name ?? 'My agent',
     baseUrl: profile?.baseUrl ?? '',
     chatPath: profile?.chatPath ?? 'chat/completions',
-    model: profile?.model ?? '',
+    models: [...(profile?.models ?? [])],
     authHeader: profile?.authHeader ?? 'Authorization',
     authScheme: profile?.authScheme ?? 'Bearer',
     apiKeyStorageMode: profile?.apiKeyStorageMode ?? 'session',
@@ -38,6 +40,7 @@ const draft = reactive<AgentProfileDraft>(initialDraft(props.profile))
 const apiKey = ref('')
 const showApiKey = ref(false)
 const persistentStorageConfirmed = ref(props.profile?.apiKeyStorageMode === 'local')
+const modelsText = ref((props.profile?.models ?? []).join('\n'))
 
 watch(
   () => props.profile,
@@ -45,11 +48,24 @@ watch(
     Object.assign(draft, initialDraft(profile))
     apiKey.value = ''
     persistentStorageConfirmed.value = profile?.apiKeyStorageMode === 'local'
+    modelsText.value = (profile?.models ?? []).join('\n')
   },
 )
 
+function parseModels(text: string): string[] {
+  const seen = new Set<string>()
+  const models: string[] = []
+  for (const line of text.split('\n')) {
+    const name = line.trim()
+    if (name && !seen.has(name)) {
+      seen.add(name)
+      models.push(name)
+    }
+  }
+  return models
+}
+
 function submission(): AgentSettingsSubmission {
-  const model = draft.model?.trim()
   const authScheme = draft.authScheme?.trim()
   const systemPrompt = draft.systemPrompt?.trim()
   return {
@@ -57,7 +73,7 @@ function submission(): AgentSettingsSubmission {
       name: draft.name,
       baseUrl: draft.baseUrl,
       chatPath: draft.chatPath,
-      ...(model ? { model } : {}),
+      models: parseModels(modelsText.value),
       authHeader: draft.authHeader,
       ...(authScheme ? { authScheme } : {}),
       apiKeyStorageMode: draft.apiKeyStorageMode,
@@ -140,9 +156,27 @@ function submit(): void {
       </p>
 
       <label>
-        <span>Model <small>optional</small></span>
-        <input v-model.trim="draft.model" autocomplete="off" placeholder="Endpoint default" />
+        <span>Models <small>one per line, optional</small></span>
+        <textarea
+          v-model="modelsText"
+          rows="3"
+          autocomplete="off"
+          placeholder="One model name per line (blank = endpoint default)"
+        />
       </label>
+
+      <label class="checkbox-row">
+        <input
+          type="checkbox"
+          :checked="syncEnabled"
+          @change="$emit('toggleSync', ($event.target as HTMLInputElement).checked)"
+        />
+        <span>Sync settings across Chrome (via your Google account)</span>
+      </label>
+      <p v-if="syncEnabled" class="test-note">
+        Base URL, models, and system instruction sync to your other Chrome devices signed in to the
+        same Google account. Your API key never syncs — enter it once per device.
+      </p>
 
       <details>
         <summary>Advanced settings</summary>
