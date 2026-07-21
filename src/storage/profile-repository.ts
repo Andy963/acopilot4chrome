@@ -144,5 +144,18 @@ function sanitizeProfile(profile: AgentProfile): AgentProfile {
     working.model = active
   }
 
+  // Keep the vision-capable set a subset of the known models.
+  const rawVision = working.visionModels
+  const visionModels = Array.isArray(rawVision)
+    ? rawVision.filter(
+        (model): model is string => typeof model === 'string' && models.includes(model),
+      )
+    : []
+  if (visionModels.length > 0) {
+    working.visionModels = visionModels
+  } else {
+    delete working.visionModels
+  }
+
   return working as unknown as AgentProfile
 }

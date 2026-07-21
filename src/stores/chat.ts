@@ -43,6 +43,8 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     question: string,
     profile: AgentProfile | null,
     contextItems: readonly ContextItem[],
+    images: readonly string[] = [],
+    historyWindow: number = Number.POSITIVE_INFINITY,
   ): Promise<boolean> {
     const latestQuestion = question.trim()
     if (!latestQuestion || active.value) return false
@@ -61,12 +63,15 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       return false
     }
 
-    const history = state.messages.filter((message) => message.status === 'complete')
+    const attachedImages = images.filter((url) => url.trim().length > 0)
+    const completeHistory = state.messages.filter((message) => message.status === 'complete')
+    const history = limitHistoryByRounds(completeHistory, historyWindow)
     const limitedContextItems = applyTotalContextLimit(contextItems, profile.maxTotalContextChars)
     const messages = buildPromptMessages({
       contextItems: limitedContextItems,
       history,
       latestQuestion,
+      ...(attachedImages.length ? { latestImages: attachedImages } : {}),
       ...(profile.systemPrompt ? { systemPrompt: profile.systemPrompt } : {}),
     })
     const createdAt = dependencies.now()
@@ -74,6 +79,8 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       id: dependencies.createId(),
       role: 'user',
       content: latestQuestion,
+      ...(attachedImages.length ? { images: attachedImages } : {}),
+      ...(limitedContextItems.length ? { contextItems: limitedContextItems } : {}),
       createdAt,
       status: 'complete',
     }
@@ -159,4 +166,29 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
 
 function safeErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+/**
+ * Keep only the most recent `window` conversation rounds — i.e. the last
+ * `window` complete user messages and the assistant replies that follow them.
+ * A non-finite window keeps the whole history.
+ */
+export function limitHistoryByRounds(
+  messages: readonly ChatMessage[],
+  window: number,
+): ChatMessage[] {
+  if (!Number.isFinite(window)) return [...messages]
+  const rounds = Math.max(0, Math.floor(window))
+  if (rounds === 0) return []
+
+  let userCount = 0
+  let startIndex = 0
+  for (let i = messages.length - 1; i >= 0; i--) {
+    startIndex = i
+    if (messages[i]!.role === 'user') {
+      userCount += 1
+      if (userCount >= rounds) break
+    }
+  }
+  return messages.slice(startIndex)
 }

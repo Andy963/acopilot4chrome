@@ -125,10 +125,21 @@ function sanitizeMessage(value: unknown): ChatMessage | null {
     return null
   }
 
+  const images = Array.isArray(message.images)
+    ? message.images.filter((url): url is string => typeof url === 'string' && url.length > 0)
+    : []
+  const contextItems = Array.isArray(message.contextItems)
+    ? message.contextItems
+        .map(sanitizeContextItem)
+        .filter((item): item is ContextItem => item !== null)
+    : []
+
   return {
     id: message.id,
     role: message.role,
     content: message.content,
+    ...(images.length ? { images } : {}),
+    ...(contextItems.length ? { contextItems } : {}),
     createdAt: message.createdAt,
     status: status === 'streaming' ? 'error' : status,
   }
@@ -201,6 +212,10 @@ function projectSession(session: ChatSession): ChatSession {
       id: message.id,
       role: message.role,
       content: message.content,
+      ...(message.images && message.images.length ? { images: [...message.images] } : {}),
+      ...(message.contextItems && message.contextItems.length
+        ? { contextItems: message.contextItems.map(projectContextItem) }
+        : {}),
       createdAt: message.createdAt,
       status: message.status,
     })),

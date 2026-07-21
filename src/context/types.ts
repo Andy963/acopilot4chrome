@@ -20,6 +20,8 @@ export interface ChatMessage {
   id: string
   role: ChatRole
   content: string
+  images?: readonly string[]
+  contextItems?: readonly ContextItem[]
   createdAt: number
   status: ChatMessageStatus
 }

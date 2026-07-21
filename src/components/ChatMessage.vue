@@ -56,6 +56,27 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 <template>
   <article class="message" :class="`message--${message.role}`">
+    <ul
+      v-if="message.contextItems?.length"
+      class="message-context"
+      aria-label="Context sent with this message"
+    >
+      <li v-for="item in message.contextItems" :key="item.id">
+        <details>
+          <summary>
+            <span class="context-kind">{{ item.kind === 'page' ? 'Page' : 'Selection' }}</span>
+            <span class="context-title">{{ item.title || item.url || 'Context' }}</span>
+            <span v-if="item.truncated" class="context-truncated">truncated</span>
+          </summary>
+          <pre>{{ item.text }}</pre>
+        </details>
+      </li>
+    </ul>
+    <ul v-if="message.images?.length" class="message-images" aria-label="Attached images">
+      <li v-for="(image, index) in message.images" :key="index">
+        <img :src="image" alt="Attached image" loading="lazy" />
+      </li>
+    </ul>
     <p v-if="message.role === 'user'" class="plain-content">{{ message.content }}</p>
     <template v-else>
       <div
@@ -104,6 +125,84 @@ async function copyCode(event: MouseEvent): Promise<void> {
 .message--assistant {
   align-self: start;
   border-bottom-left-radius: 0.25rem;
+}
+
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.message-context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.message-context details {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.message-context summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+}
+
+.context-kind {
+  flex: none;
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.context-title {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-truncated {
+  flex: none;
+  margin-left: auto;
+  color: var(--warning);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.message-context pre {
+  overflow: auto;
+  max-height: 10rem;
+  margin: 0;
+  padding: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.message-images img {
+  display: block;
+  max-width: 8rem;
+  max-height: 8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  object-fit: cover;
 }
 
 .typing {

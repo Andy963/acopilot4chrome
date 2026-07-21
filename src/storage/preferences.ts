@@ -1,6 +1,16 @@
 import type { StorageArea } from './storage-area'
 
 export const SYNC_ENABLED_STORAGE_KEY = 'syncSettingsEnabled'
+export const HISTORY_WINDOW_STORAGE_KEY = 'historyWindowTurns'
+
+export const DEFAULT_HISTORY_WINDOW = 4
+export const MIN_HISTORY_WINDOW = 1
+export const MAX_HISTORY_WINDOW = 50
+
+export function clampHistoryWindow(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_HISTORY_WINDOW
+  return Math.min(MAX_HISTORY_WINDOW, Math.max(MIN_HISTORY_WINDOW, Math.round(value)))
+}
 
 /**
  * Device-local preferences. These never sync: whether *this* device mirrors its
@@ -16,5 +26,15 @@ export class PreferencesRepository {
 
   async setSyncEnabled(enabled: boolean): Promise<void> {
     await this.localStorage.set({ [SYNC_ENABLED_STORAGE_KEY]: enabled })
+  }
+
+  async getHistoryWindow(): Promise<number> {
+    const values = await this.localStorage.get(HISTORY_WINDOW_STORAGE_KEY)
+    const stored = values[HISTORY_WINDOW_STORAGE_KEY]
+    return typeof stored === 'number' ? clampHistoryWindow(stored) : DEFAULT_HISTORY_WINDOW
+  }
+
+  async setHistoryWindow(turns: number): Promise<void> {
+    await this.localStorage.set({ [HISTORY_WINDOW_STORAGE_KEY]: clampHistoryWindow(turns) })
   }
 }

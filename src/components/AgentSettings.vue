@@ -26,6 +26,7 @@ function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
     baseUrl: profile?.baseUrl ?? '',
     chatPath: profile?.chatPath ?? 'chat/completions',
     models: [...(profile?.models ?? [])],
+    visionModels: [...(profile?.visionModels ?? [])],
     authHeader: profile?.authHeader ?? 'Authorization',
     authScheme: profile?.authScheme ?? 'Bearer',
     apiKeyStorageMode: profile?.apiKeyStorageMode ?? 'session',
@@ -36,16 +37,22 @@ function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
   }
 }
 
-function initialModelRows(profile: AgentProfile | null): string[] {
-  const models = profile?.models ?? []
-  return models.length ? [...models] : ['']
+interface ModelRow {
+  name: string
+  vision: boolean
+}
+
+function initialModelRows(profile: AgentProfile | null): ModelRow[] {
+  const vision = new Set(profile?.visionModels ?? [])
+  const rows = (profile?.models ?? []).map((name) => ({ name, vision: vision.has(name) }))
+  return rows.length ? rows : [{ name: '', vision: false }]
 }
 
 const draft = reactive<AgentProfileDraft>(initialDraft(props.profile))
 const apiKey = ref('')
 const showApiKey = ref(false)
 const persistentStorageConfirmed = ref(props.profile?.apiKeyStorageMode === 'local')
-const modelRows = ref<string[]>(initialModelRows(props.profile))
+const modelRows = ref<ModelRow[]>(initialModelRows(props.profile))
 
 watch(
   () => props.profile,
@@ -58,36 +65,40 @@ watch(
 )
 
 function addModel(): void {
-  modelRows.value.push('')
+  modelRows.value.push({ name: '', vision: false })
 }
 
 function removeModel(index: number): void {
   modelRows.value.splice(index, 1)
-  if (modelRows.value.length === 0) modelRows.value.push('')
+  if (modelRows.value.length === 0) modelRows.value.push({ name: '', vision: false })
 }
 
-function parseModels(values: readonly string[]): string[] {
+function parseModelRows(rows: readonly ModelRow[]): { models: string[]; visionModels: string[] } {
   const seen = new Set<string>()
   const models: string[] = []
-  for (const value of values) {
-    const name = value.trim()
+  const visionModels: string[] = []
+  for (const row of rows) {
+    const name = row.name.trim()
     if (name && !seen.has(name)) {
       seen.add(name)
       models.push(name)
+      if (row.vision) visionModels.push(name)
     }
   }
-  return models
+  return { models, visionModels }
 }
 
 function submission(): AgentSettingsSubmission {
   const authScheme = draft.authScheme?.trim()
   const systemPrompt = draft.systemPrompt?.trim()
+  const { models, visionModels } = parseModelRows(modelRows.value)
   return {
     profile: {
       name: draft.name,
       baseUrl: draft.baseUrl,
       chatPath: draft.chatPath,
-      models: parseModels(modelRows.value),
+      models,
+      visionModels,
       authHeader: draft.authHeader,
       ...(authScheme ? { authScheme } : {}),
       apiKeyStorageMode: draft.apiKeyStorageMode,
@@ -182,12 +193,16 @@ function submit(): void {
             +
           </button>
         </div>
-        <div v-for="(model, index) in modelRows" :key="index" class="model-row">
+        <div v-for="(row, index) in modelRows" :key="index" class="model-row">
           <input
-            v-model.trim="modelRows[index]"
+            v-model.trim="row.name"
             autocomplete="off"
             placeholder="Model name (blank = endpoint default)"
           />
+          <label class="vision-toggle" title="This model accepts image input (multimodal)">
+            <input v-model="row.vision" type="checkbox" />
+            <span>Vision</span>
+          </label>
           <button
             type="button"
             class="icon-button"
@@ -353,8 +368,24 @@ small {
   gap: 0.4rem;
 }
 
-.model-row input {
+.model-row > input {
   flex: 1;
+  min-width: 0;
+}
+
+.vision-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vision-toggle input {
+  width: auto;
 }
 
 .icon-button {

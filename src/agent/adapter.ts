@@ -11,6 +11,7 @@ export interface AgentProfile {
   chatPath: string
   models: readonly string[]
   model?: string
+  visionModels?: readonly string[]
   authHeader: string
   authScheme?: string
   apiKeyStorageMode: ApiKeyStorageMode
@@ -22,9 +23,13 @@ export interface AgentProfile {
   updatedAt: number
 }
 
+export type AgentContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface AgentMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | AgentContentPart[]
 }
 
 export interface AgentRequest {

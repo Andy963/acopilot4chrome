@@ -1,4 +1,4 @@
-import type { AgentMessage } from '../agent/adapter'
+import type { AgentContentPart, AgentMessage } from '../agent/adapter'
 import type { ChatMessage, ContextItem } from './types'
 
 export const DEFAULT_SYSTEM_INSTRUCTION = `You are answering a user question using optional web page context.
@@ -9,6 +9,7 @@ export interface BuildPromptMessagesOptions {
   contextItems: readonly ContextItem[]
   history: readonly ChatMessage[]
   latestQuestion: string
+  latestImages?: readonly string[]
   systemPrompt?: string
 }
 
@@ -27,8 +28,29 @@ export function buildPromptMessages(options: BuildPromptMessagesOptions): AgentM
     ...options.history.map(({ role, content }) => ({ role, content })),
     {
       role: 'user',
-      content: buildLatestUserMessage(options.contextItems, options.latestQuestion),
+      content: buildLatestUserContent(
+        options.contextItems,
+        options.latestQuestion,
+        options.latestImages,
+      ),
     },
+  ]
+}
+
+function buildLatestUserContent(
+  contextItems: readonly ContextItem[],
+  latestQuestion: string,
+  latestImages: readonly string[] | undefined,
+): string | AgentContentPart[] {
+  const text = buildLatestUserMessage(contextItems, latestQuestion)
+  const images = (latestImages ?? []).filter((url) => url.trim().length > 0)
+  if (images.length === 0) {
+    return text
+  }
+
+  return [
+    { type: 'text', text },
+    ...images.map((url): AgentContentPart => ({ type: 'image_url', image_url: { url } })),
   ]
 }
 

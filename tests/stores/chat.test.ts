@@ -7,8 +7,8 @@ import type {
   AgentStreamEvent,
 } from '../../src/agent/adapter'
 import { applyTotalContextLimit } from '../../src/context/truncate'
-import type { ContextItem } from '../../src/context/types'
-import { createChatStore } from '../../src/stores/chat'
+import type { ChatMessage, ContextItem } from '../../src/context/types'
+import { createChatStore, limitHistoryByRounds } from '../../src/stores/chat'
 
 const profile: AgentProfile = {
   id: 'profile-1',
@@ -148,7 +148,59 @@ describe('chat store', () => {
       content: 'The response was interrupted.',
     })
   })
+
+  it('snapshots the sent context items onto the user message', async () => {
+    const store = createChatStore({
+      adapter: {
+        testConnection: vi.fn(),
+        async *stream(): AsyncIterable<AgentStreamEvent> {
+          yield { type: 'completed' }
+        },
+      },
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+    })
+
+    await store.send('Question', profile, [createContextItem('context-1', 'Selection', 'abc')])
+
+    expect(store.state.messages[0]?.contextItems?.map((item) => item.id)).toEqual(['context-1'])
+  })
 })
+
+describe('limitHistoryByRounds', () => {
+  const messages: ChatMessage[] = [
+    historyMessage('u1', 'user'),
+    historyMessage('a1', 'assistant'),
+    historyMessage('u2', 'user'),
+    historyMessage('a2', 'assistant'),
+    historyMessage('u3', 'user'),
+    historyMessage('a3', 'assistant'),
+  ]
+
+  it('keeps only the last N user turns and their replies', () => {
+    expect(limitHistoryByRounds(messages, 2).map((message) => message.id)).toEqual([
+      'u2',
+      'a2',
+      'u3',
+      'a3',
+    ])
+  })
+
+  it('keeps the whole history when the window exceeds it or is infinite', () => {
+    expect(limitHistoryByRounds(messages, 10)).toHaveLength(6)
+    expect(limitHistoryByRounds(messages, Number.POSITIVE_INFINITY)).toHaveLength(6)
+  })
+
+  it('returns nothing for a zero window', () => {
+    expect(limitHistoryByRounds(messages, 0)).toEqual([])
+  })
+})
+
+function historyMessage(id: string, role: 'user' | 'assistant'): ChatMessage {
+  return { id, role, content: id, status: 'complete', createdAt: 1 }
+}
 
 function sequentialIds(): () => string {
   let index = 0

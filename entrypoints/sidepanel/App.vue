@@ -18,7 +18,11 @@ import {
   removeEndpointPermissionIfUnused,
 } from '../../src/permissions/endpoint-permission'
 import { createId } from '../../src/shared/ids'
-import { PreferencesRepository } from '../../src/storage/preferences'
+import {
+  clampHistoryWindow,
+  DEFAULT_HISTORY_WINDOW,
+  PreferencesRepository,
+} from '../../src/storage/preferences'
 import { ProfileRepository } from '../../src/storage/profile-repository'
 import { SecretRepository } from '../../src/storage/secret-repository'
 import { SessionRepository } from '../../src/storage/session-repository'
@@ -44,6 +48,7 @@ const restoring = ref(true)
 const appError = ref<string | null>(null)
 const messageList = ref<HTMLElement>()
 const syncEnabled = ref(false)
+const historyWindow = ref(DEFAULT_HISTORY_WINDOW)
 
 let sessionId = createId()
 let sessionCreatedAt = Date.now()
@@ -124,6 +129,13 @@ const combinedError = computed(
     appError.value ?? profileStore.state.error ?? contextStore.state.error ?? chatStore.state.error,
 )
 
+const activeModelIsMultimodal = computed(() => {
+  const profile = profileStore.profile.value
+  if (!profile) return false
+  const active = profile.model ?? profile.models?.[0]
+  return !!active && (profile.visionModels?.includes(active) ?? false)
+})
+
 async function persistSession(): Promise<void> {
   const snapshot = {
     id: sessionId,
@@ -142,6 +154,7 @@ async function restore(): Promise<void> {
   appError.value = null
   try {
     syncEnabled.value = await preferences.getSyncEnabled()
+    historyWindow.value = await preferences.getHistoryWindow()
     await profileStore.restore()
     const session = await sessions.loadActiveSession()
     const activeProfileId = profileStore.profile.value?.id
@@ -230,6 +243,29 @@ async function setSync(enabled: boolean): Promise<void> {
   }
 }
 
+async function submitQuestion(question: string, images: string[]): Promise<void> {
+  const sent = await chatStore.send(
+    question,
+    profileStore.profile.value,
+    contextStore.state.items,
+    images,
+    historyWindow.value,
+  )
+  // Context belongs to the question it was sent with, so release the staging
+  // area once it has been folded into that message.
+  if (sent) await contextStore.clear()
+}
+
+async function updateHistoryWindow(event: Event): Promise<void> {
+  const value = clampHistoryWindow(Number((event.target as HTMLInputElement).value))
+  historyWindow.value = value
+  try {
+    await preferences.setHistoryWindow(value)
+  } catch (error) {
+    appError.value = safeErrorMessage(error, 'Unable to save the history window.')
+  }
+}
+
 function buildProfile(
   current: AgentProfile | null,
   draft: AgentProfileDraft,
@@ -237,6 +273,7 @@ function buildProfile(
 ): AgentProfile {
   const models = draft.models
   const activeModel = current?.model && models.includes(current.model) ? current.model : models[0]
+  const visionModels = draft.visionModels.filter((model) => models.includes(model))
   return {
     id: current?.id ?? createId(),
     name: draft.name,
@@ -245,6 +282,7 @@ function buildProfile(
     chatPath: draft.chatPath,
     models,
     ...(activeModel ? { model: activeModel } : {}),
+    ...(visionModels.length ? { visionModels } : {}),
     authHeader: draft.authHeader,
     ...(draft.authScheme ? { authScheme: draft.authScheme } : {}),
     apiKeyStorageMode: draft.apiKeyStorageMode,
@@ -360,6 +398,22 @@ onBeforeUnmount(() => {
         @remove="contextStore.remove"
       />
 
+      <div class="history-window">
+        <label for="history-window">Context window</label>
+        <input
+          id="history-window"
+          type="number"
+          min="1"
+          max="50"
+          :value="historyWindow"
+          aria-describedby="history-window-hint"
+          @change="updateHistoryWindow"
+        />
+        <span id="history-window-hint" class="history-window__hint">
+          last {{ historyWindow }} of your messages + replies sent
+        </span>
+      </div>
+
       <section ref="messageList" class="messages" aria-label="Conversation" aria-live="polite">
         <p v-if="restoring" class="loading">Restoring session…</p>
         <EmptyState
@@ -377,7 +431,8 @@ onBeforeUnmount(() => {
       <ChatComposer
         :active="chatStore.active.value"
         :disabled="restoring || !profileStore.profile.value"
-        @send="chatStore.send($event, profileStore.profile.value, contextStore.state.items)"
+        :multimodal="activeModelIsMultimodal"
+        @send="submitQuestion"
         @cancel="chatStore.cancel"
       />
     </template>
@@ -456,13 +511,19 @@ summary:focus-visible {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+}
+
+.context-section,
+.composer {
+  flex: none;
 }
 
 .app-header {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -516,6 +577,7 @@ summary:focus-visible {
 }
 
 .banner {
+  flex: none;
   padding: 0.55rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--warning-soft);
@@ -528,10 +590,44 @@ summary:focus-visible {
   color: var(--danger);
 }
 
+.history-window {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.history-window label {
+  font-weight: 650;
+}
+
+.history-window input {
+  width: 3.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.35rem;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.history-window__hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .messages {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem;
   scroll-behavior: smooth;

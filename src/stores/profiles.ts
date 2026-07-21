@@ -7,6 +7,7 @@ export interface AgentProfileDraft {
   baseUrl: string
   chatPath: string
   models: string[]
+  visionModels: string[]
   authHeader: string
   authScheme?: string
   apiKeyStorageMode: ApiKeyStorageMode

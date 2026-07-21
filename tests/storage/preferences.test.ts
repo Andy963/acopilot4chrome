@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PreferencesRepository } from '../../src/storage/preferences'
+import { DEFAULT_HISTORY_WINDOW, PreferencesRepository } from '../../src/storage/preferences'
 import { MemoryStorage } from './memory-storage'
 
 describe('PreferencesRepository', () => {
@@ -14,5 +14,20 @@ describe('PreferencesRepository', () => {
 
     await prefs.setSyncEnabled(false)
     expect(await prefs.getSyncEnabled()).toBe(false)
+  })
+
+  it('defaults the history window and clamps out-of-range values', async () => {
+    const prefs = new PreferencesRepository(new MemoryStorage())
+
+    expect(await prefs.getHistoryWindow()).toBe(DEFAULT_HISTORY_WINDOW)
+
+    await prefs.setHistoryWindow(8)
+    expect(await prefs.getHistoryWindow()).toBe(8)
+
+    await prefs.setHistoryWindow(0)
+    expect(await prefs.getHistoryWindow()).toBe(1)
+
+    await prefs.setHistoryWindow(999)
+    expect(await prefs.getHistoryWindow()).toBe(50)
   })
 })
