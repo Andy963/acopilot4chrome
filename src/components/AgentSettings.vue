@@ -36,11 +36,16 @@ function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
   }
 }
 
+function initialModelRows(profile: AgentProfile | null): string[] {
+  const models = profile?.models ?? []
+  return models.length ? [...models] : ['']
+}
+
 const draft = reactive<AgentProfileDraft>(initialDraft(props.profile))
 const apiKey = ref('')
 const showApiKey = ref(false)
 const persistentStorageConfirmed = ref(props.profile?.apiKeyStorageMode === 'local')
-const modelsText = ref((props.profile?.models ?? []).join('\n'))
+const modelRows = ref<string[]>(initialModelRows(props.profile))
 
 watch(
   () => props.profile,
@@ -48,15 +53,24 @@ watch(
     Object.assign(draft, initialDraft(profile))
     apiKey.value = ''
     persistentStorageConfirmed.value = profile?.apiKeyStorageMode === 'local'
-    modelsText.value = (profile?.models ?? []).join('\n')
+    modelRows.value = initialModelRows(profile)
   },
 )
 
-function parseModels(text: string): string[] {
+function addModel(): void {
+  modelRows.value.push('')
+}
+
+function removeModel(index: number): void {
+  modelRows.value.splice(index, 1)
+  if (modelRows.value.length === 0) modelRows.value.push('')
+}
+
+function parseModels(values: readonly string[]): string[] {
   const seen = new Set<string>()
   const models: string[] = []
-  for (const line of text.split('\n')) {
-    const name = line.trim()
+  for (const value of values) {
+    const name = value.trim()
     if (name && !seen.has(name)) {
       seen.add(name)
       models.push(name)
@@ -73,7 +87,7 @@ function submission(): AgentSettingsSubmission {
       name: draft.name,
       baseUrl: draft.baseUrl,
       chatPath: draft.chatPath,
-      models: parseModels(modelsText.value),
+      models: parseModels(modelRows.value),
       authHeader: draft.authHeader,
       ...(authScheme ? { authScheme } : {}),
       apiKeyStorageMode: draft.apiKeyStorageMode,
@@ -155,15 +169,36 @@ function submit(): void {
         keychain.
       </p>
 
-      <label>
-        <span>Models <small>one per line, optional</small></span>
-        <textarea
-          v-model="modelsText"
-          rows="3"
-          autocomplete="off"
-          placeholder="One model name per line (blank = endpoint default)"
-        />
-      </label>
+      <div class="field">
+        <div class="field-header">
+          <span>Models <small>optional</small></span>
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Add model"
+            title="Add model"
+            @click="addModel"
+          >
+            +
+          </button>
+        </div>
+        <div v-for="(model, index) in modelRows" :key="index" class="model-row">
+          <input
+            v-model.trim="modelRows[index]"
+            autocomplete="off"
+            placeholder="Model name (blank = endpoint default)"
+          />
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Remove model"
+            title="Remove model"
+            @click="removeModel(index)"
+          >
+            −
+          </button>
+        </div>
+      </div>
 
       <label class="checkbox-row">
         <input
@@ -222,13 +257,14 @@ function submit(): void {
         >
           Delete profile
         </button>
-        <span class="spacer" />
-        <button type="button" :disabled="busy" @click="$emit('test', submission())">
-          {{ busy ? 'Working…' : 'Test connection' }}
-        </button>
-        <button class="primary-button" type="submit" :disabled="busy">
-          {{ busy ? 'Saving…' : 'Save' }}
-        </button>
+        <div class="action-group">
+          <button type="button" :disabled="busy" @click="$emit('test', submission())">
+            {{ busy ? 'Working…' : 'Test connection' }}
+          </button>
+          <button class="primary-button" type="submit" :disabled="busy">
+            {{ busy ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
       </div>
     </form>
   </section>
@@ -294,6 +330,43 @@ label {
 
 small {
   font-weight: 450;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.model-row input {
+  flex: 1;
+}
+
+.icon-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 input,
@@ -391,8 +464,11 @@ summary {
   gap: 0.5rem;
 }
 
-.spacer {
-  flex: 1;
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 button {

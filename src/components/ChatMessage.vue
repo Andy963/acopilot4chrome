@@ -56,18 +56,33 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 <template>
   <article class="message" :class="`message--${message.role}`">
-    <div class="message-heading">
-      <span>{{ message.role === 'user' ? 'You' : 'Agent' }}</span>
-      <span v-if="message.status !== 'complete'" class="status">{{ message.status }}</span>
-    </div>
     <p v-if="message.role === 'user'" class="plain-content">{{ message.content }}</p>
-    <div
-      v-else
-      class="markdown-content"
-      :aria-busy="message.status === 'streaming'"
-      @click="copyCode"
-      v-html="renderedContent"
-    />
+    <template v-else>
+      <div
+        v-if="message.content"
+        class="markdown-content"
+        :aria-busy="message.status === 'streaming'"
+        @click="copyCode"
+        v-html="renderedContent"
+      />
+      <div
+        v-else-if="message.status === 'streaming'"
+        class="typing"
+        role="status"
+        aria-label="Assistant is responding"
+      >
+        <span class="typing-dot" />
+        <span class="typing-dot" />
+        <span class="typing-dot" />
+      </div>
+      <p
+        v-if="message.status === 'error' || message.status === 'cancelled'"
+        class="status"
+        :class="`status--${message.status}`"
+      >
+        {{ message.status === 'error' ? 'Response failed' : 'Cancelled' }}
+      </p>
+    </template>
   </article>
 </template>
 
@@ -91,20 +106,61 @@ async function copyCode(event: MouseEvent): Promise<void> {
   border-bottom-left-radius: 0.25rem;
 }
 
-.message-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.35rem;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0;
+}
+
+.typing-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-0.2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .status {
-  color: var(--warning);
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.status--error {
+  color: var(--danger);
+}
+
+.status--cancelled {
+  color: var(--muted);
 }
 
 .plain-content {
