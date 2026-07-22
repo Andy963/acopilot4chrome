@@ -11,6 +11,26 @@ describe('renderMarkdown', () => {
     expect(block).toContain('katex')
   })
 
+  it('normalizes common model-generated LaTeX delimiters', () => {
+    const inline = renderMarkdown('The value is \\(x^2 + 1\\).')
+    expect(inline).toContain('katex')
+    expect(inline).not.toContain('\\(')
+
+    const block = renderMarkdown('Before\n\\[\n\\frac{a}{b}\n\\]\nAfter')
+    expect(block).toContain('katex-display')
+    expect(block).not.toContain('\\[')
+
+    const adjacent = renderMarkdown('\\(a\\)\\(b\\)')
+    expect(adjacent.match(/class="katex"/g)).toHaveLength(2)
+  })
+
+  it('preserves LaTeX delimiters inside inline and fenced code', () => {
+    const html = renderMarkdown('`\\(inline\\)`\n\n```tex\n\\[\nx + y\n\\]\n```')
+    expect(html).toContain('\\(inline\\)')
+    expect(html).toContain('\\[')
+    expect(html).not.toContain('katex')
+  })
+
   it('keeps code blocks with a copy button and does not emit raw HTML', () => {
     const html = renderMarkdown('```js\nconst a = 1\n```\n\n<img src=x onerror=alert(1)>')
     expect(html).toContain('copy-code')

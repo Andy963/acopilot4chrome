@@ -7,6 +7,12 @@ import { validateAgentProfile } from '../../src/agent/url'
 import AgentSettings from '../../src/components/AgentSettings.vue'
 import ChatComposer from '../../src/components/ChatComposer.vue'
 import ChatMessage from '../../src/components/ChatMessage.vue'
+import {
+  getBoundedStreamingScrollTop,
+  isNearScrollBottom,
+  shouldFollowAfterManualScroll,
+  shouldPauseFollowingForWheel,
+} from '../../src/components/chat-scroll'
 import ContextList from '../../src/components/ContextList.vue'
 import EmptyState from '../../src/components/EmptyState.vue'
 import type { ChatMessage as ChatMessageData, ContextItem } from '../../src/context/types'
@@ -49,13 +55,15 @@ const appError = ref<string | null>(null)
 const messageList = ref<HTMLElement>()
 const syncEnabled = ref(false)
 const historyWindow = ref(DEFAULT_HISTORY_WINDOW)
-const pinnedToBottom = ref(true)
+const followingOutput = ref(true)
 
 let sessionId = createId()
 let sessionCreatedAt = Date.now()
 let currentContextItems: readonly ContextItem[] = []
 let currentMessages: readonly ChatMessageData[] = []
 let persistenceQueue = Promise.resolve()
+let lastMessageListScrollTop = 0
+let programmaticScrollTop: number | null = null
 
 const profileStore = createProfileStore({
   async loadActiveProfile() {
@@ -245,7 +253,7 @@ async function setSync(enabled: boolean): Promise<void> {
 }
 
 async function submitQuestion(question: string, images: string[]): Promise<void> {
-  pinnedToBottom.value = true
+  startFollowingOutput()
   const sent = await chatStore.send(
     question,
     profileStore.profile.value,
@@ -259,7 +267,7 @@ async function submitQuestion(question: string, images: string[]): Promise<void>
 }
 
 async function retryLast(): Promise<void> {
-  pinnedToBottom.value = true
+  startFollowingOutput()
   await chatStore.retry(profileStore.profile.value)
 }
 
@@ -273,11 +281,61 @@ async function updateHistoryWindow(value: number): Promise<void> {
   }
 }
 
+function startFollowingOutput(): void {
+  const element = messageList.value
+  followingOutput.value = true
+  programmaticScrollTop = null
+  lastMessageListScrollTop = element?.scrollTop ?? 0
+}
+
+function onMessagesWheel(event: WheelEvent): void {
+  const element = messageList.value
+  const isAtBottom =
+    !element || isNearScrollBottom(element.scrollHeight, element.scrollTop, element.clientHeight)
+  if (!shouldPauseFollowingForWheel(event.deltaY, isAtBottom)) return
+  followingOutput.value = false
+  programmaticScrollTop = null
+}
+
 function onMessagesScroll(): void {
   const element = messageList.value
-  if (element) {
-    pinnedToBottom.value = element.scrollHeight - element.scrollTop - element.clientHeight <= 48
+  if (!element) return
+
+  const currentScrollTop = element.scrollTop
+  if (programmaticScrollTop !== null && Math.abs(currentScrollTop - programmaticScrollTop) <= 1) {
+    programmaticScrollTop = null
+    lastMessageListScrollTop = currentScrollTop
+    return
   }
+
+  programmaticScrollTop = null
+  followingOutput.value = shouldFollowAfterManualScroll(
+    element.scrollHeight,
+    lastMessageListScrollTop,
+    currentScrollTop,
+    element.clientHeight,
+  )
+  lastMessageListScrollTop = currentScrollTop
+}
+
+function getAutoScrollTop(element: HTMLElement): number {
+  const bottom = Math.max(0, element.scrollHeight - element.clientHeight)
+  const streamingMessage = element.querySelector<HTMLElement>(
+    '[data-message-role="assistant"][data-message-status="streaming"]',
+  )
+  if (!streamingMessage) return bottom
+
+  const containerRect = element.getBoundingClientRect()
+  const messageRect = streamingMessage.getBoundingClientRect()
+  const paddingTop = Number.parseFloat(getComputedStyle(element).paddingTop) || 0
+  return getBoundedStreamingScrollTop({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    scrollTop: element.scrollTop,
+    containerTop: containerRect.top,
+    messageTop: messageRect.top,
+    paddingTop,
+  })
 }
 
 function buildProfile(
@@ -332,12 +390,16 @@ function safeErrorMessage(error: unknown, fallback: string): string {
 watch(
   () => chatStore.state.messages.map((message) => `${message.id}:${message.content.length}`),
   () => {
-    // Follow streaming output only while the user is parked at the bottom; if
-    // they scroll up to read, stop yanking the view down.
-    if (!pinnedToBottom.value) return
+    if (!followingOutput.value) return
     void nextTick(() => {
+      if (!followingOutput.value) return
       const element = messageList.value
-      if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'instant' })
+      if (!element) return
+
+      const target = getAutoScrollTop(element)
+      lastMessageListScrollTop = element.scrollTop
+      programmaticScrollTop = target
+      element.scrollTo({ top: target, behavior: 'instant' })
     })
   },
 )
@@ -430,6 +492,7 @@ onBeforeUnmount(() => {
         aria-label="Conversation"
         aria-live="polite"
         @scroll="onMessagesScroll"
+        @wheel.passive="onMessagesWheel"
       >
         <p v-if="restoring" class="loading">Restoring session…</p>
         <EmptyState

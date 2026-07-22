@@ -37,7 +37,12 @@ async function copyCode(event: MouseEvent): Promise<void> {
 </script>
 
 <template>
-  <article class="message" :class="`message--${message.role}`">
+  <article
+    class="message"
+    :class="`message--${message.role}`"
+    :data-message-role="message.role"
+    :data-message-status="message.status"
+  >
     <ul
       v-if="message.contextItems?.length"
       class="message-context"

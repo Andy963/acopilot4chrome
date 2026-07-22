@@ -57,7 +57,44 @@ markdown.renderer.rules.fence = (tokens, index, options, environment, renderer) 
   return `<div class="code-block"><button class="copy-code" type="button">Copy code</button>${code}</div>`
 }
 
+function normalizeMathDelimiters(content: string): string {
+  const normalized = content.replace(/\r\n?/g, '\n').replace(/[\u2028\u2029\u0085]/g, '\n')
+  if (!/\\(?:\(|\[)/.test(normalized) && !/\$\$[\s\S]*\n[\s\S]*\$\$/.test(normalized)) {
+    return normalized
+  }
+
+  const protectedCode: string[] = []
+  const stashCode = (match: string): string => {
+    const index = protectedCode.push(match) - 1
+    return `\uE000ACOPILOT_CODE_${index}\uE001`
+  }
+
+  let working = normalized.replace(/(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\1/g, stashCode)
+  working = working.replace(/(`+)[^`\n]*?\1/g, stashCode)
+  working = working.replace(
+    /\\\[([\s\S]+?)\\\]/g,
+    (_match, formula: string) => `\n\n$$\n${formula.trim()}\n$$\n\n`,
+  )
+  working = working.replace(
+    /\\\(([\s\S]+?)\\\)/g,
+    (match, formula: string, offset: number, source: string) => {
+      const nextOffset = offset + match.length
+      const leadingSpace = source[offset - 1] === '$' ? ' ' : ''
+      const trailingSpace =
+        source[nextOffset] === '$' || source.slice(nextOffset, nextOffset + 2) === '\\(' ? ' ' : ''
+      return `${leadingSpace}$${formula}$${trailingSpace}`
+    },
+  )
+  working = working.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula: string) =>
+    formula.includes('\n') ? `\n\n$$\n${formula.trim()}\n$$\n\n` : match,
+  )
+
+  return working.replace(/\uE000ACOPILOT_CODE_(\d+)\uE001/g, (_match, index: string) => {
+    return protectedCode[Number(index)] ?? ''
+  })
+}
+
 /** Render assistant Markdown (with LaTeX math) to sanitized HTML. */
 export function renderMarkdown(content: string): string {
-  return markdown.render(content)
+  return markdown.render(normalizeMathDelimiters(content))
 }
