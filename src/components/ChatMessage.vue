@@ -66,10 +66,16 @@ async function copyCode(event: MouseEvent): Promise<void> {
     </ul>
     <p v-if="message.role === 'user'" class="plain-content">{{ message.content }}</p>
     <template v-else>
+      <p
+        v-if="message.status === 'streaming' && message.content"
+        class="plain-content streaming-content"
+        aria-live="polite"
+      >
+        {{ message.content }}
+      </p>
       <div
-        v-if="message.content"
+        v-else-if="message.content"
         class="markdown-content"
-        :aria-busy="message.status === 'streaming'"
         @click="copyCode"
         v-html="renderedContent"
       />
@@ -278,6 +284,10 @@ async function copyCode(event: MouseEvent): Promise<void> {
   margin: 0;
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.streaming-content {
+  overflow-wrap: anywhere;
 }
 
 .markdown-content {
