@@ -167,7 +167,104 @@ describe('chat store', () => {
 
     expect(store.state.messages[0]?.contextItems?.map((item) => item.id)).toEqual(['context-1'])
   })
+
+  it('retries retryable failures up to three attempts and then succeeds', async () => {
+    let attempts = 0
+    const adapter: AgentAdapter = {
+      testConnection: vi.fn(),
+      async *stream(): AsyncIterable<AgentStreamEvent> {
+        attempts += 1
+        if (attempts < 3) {
+          yield retryableError()
+          return
+        }
+        yield { type: 'content-delta', text: 'ok' }
+        yield { type: 'completed' }
+      },
+    }
+    const store = createChatStore({
+      adapter,
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+      delay: async () => undefined,
+    })
+
+    expect(await store.send('Question', profile, [])).toBe(true)
+    expect(attempts).toBe(3)
+    expect(store.state.messages[1]).toMatchObject({ content: 'ok', status: 'complete' })
+    expect(store.state.canRetry).toBe(false)
+  })
+
+  it('exposes a retry after exhausting attempts and clears the failed reply on success', async () => {
+    let calls = 0
+    const adapter: AgentAdapter = {
+      testConnection: vi.fn(),
+      async *stream(): AsyncIterable<AgentStreamEvent> {
+        calls += 1
+        if (calls <= 3) {
+          yield retryableError()
+          return
+        }
+        yield { type: 'content-delta', text: 'recovered' }
+        yield { type: 'completed' }
+      },
+    }
+    const store = createChatStore({
+      adapter,
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+      delay: async () => undefined,
+    })
+
+    expect(await store.send('Question', profile, [])).toBe(false)
+    expect(calls).toBe(3)
+    expect(store.state.canRetry).toBe(true)
+    expect(store.state.messages[1]).toMatchObject({ role: 'assistant', status: 'error' })
+
+    expect(await store.retry(profile)).toBe(true)
+    expect(calls).toBe(4)
+    expect(store.state.messages).toHaveLength(2)
+    expect(store.state.messages[1]).toMatchObject({ content: 'recovered', status: 'complete' })
+    expect(store.state.canRetry).toBe(false)
+  })
+
+  it('does not retry non-retryable failures', async () => {
+    let calls = 0
+    const adapter: AgentAdapter = {
+      testConnection: vi.fn(),
+      async *stream(): AsyncIterable<AgentStreamEvent> {
+        calls += 1
+        yield {
+          type: 'error',
+          error: { code: 'AUTH_ERROR', message: 'bad key', retryable: false, status: 401 },
+        }
+      },
+    }
+    const store = createChatStore({
+      adapter,
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+      delay: async () => undefined,
+    })
+
+    expect(await store.send('Question', profile, [])).toBe(false)
+    expect(calls).toBe(1)
+    expect(store.state.messages[1]).toMatchObject({ status: 'error' })
+  })
 })
+
+function retryableError(): AgentStreamEvent {
+  return {
+    type: 'error',
+    error: { code: 'UPSTREAM_ERROR', message: 'temporary', retryable: true, status: 500 },
+  }
+}
 
 describe('limitHistoryByRounds', () => {
   const messages: ChatMessage[] = [

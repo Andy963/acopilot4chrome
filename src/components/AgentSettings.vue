@@ -120,6 +120,95 @@ function submit(): void {
   if (draft.apiKeyStorageMode === 'local' && !persistentStorageConfirmed.value) return
   emit('save', submission())
 }
+
+const importInput = ref<HTMLInputElement>()
+const importError = ref('')
+
+function exportSettings(): void {
+  const { models, visionModels } = parseModelRows(modelRows.value)
+  const data = {
+    type: 'acopilot4chrome-settings',
+    version: 1,
+    profile: {
+      name: draft.name,
+      baseUrl: draft.baseUrl,
+      chatPath: draft.chatPath,
+      models,
+      visionModels,
+      authHeader: draft.authHeader,
+      authScheme: draft.authScheme,
+      apiKeyStorageMode: draft.apiKeyStorageMode,
+      requestTimeoutMs: draft.requestTimeoutMs,
+      maxContextItemChars: draft.maxContextItemChars,
+      maxTotalContextChars: draft.maxTotalContextChars,
+      systemPrompt: draft.systemPrompt,
+    },
+  }
+  // The API key is a secret and is intentionally never exported.
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = 'acopilot-settings.json'
+  anchor.click()
+  // Defer revocation so the browser has started the download before the blob
+  // URL is released.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function triggerImport(): void {
+  importError.value = ''
+  importInput.value?.click()
+}
+
+async function importSettings(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  target.value = ''
+  if (!file) return
+
+  importError.value = ''
+  try {
+    const parsed = JSON.parse(await file.text()) as { profile?: Partial<AgentProfileDraft> }
+    const source = parsed?.profile
+    if (!source || typeof source !== 'object') throw new Error('Missing profile.')
+    applyImported(source)
+  } catch {
+    importError.value = 'That file is not a valid Acopilot settings export.'
+  }
+}
+
+function applyImported(source: Partial<AgentProfileDraft>): void {
+  if (typeof source.name === 'string') draft.name = source.name
+  if (typeof source.baseUrl === 'string') draft.baseUrl = source.baseUrl
+  if (typeof source.chatPath === 'string') draft.chatPath = source.chatPath
+  if (typeof source.authHeader === 'string') draft.authHeader = source.authHeader
+  if (typeof source.authScheme === 'string') draft.authScheme = source.authScheme
+  if (source.apiKeyStorageMode === 'local' || source.apiKeyStorageMode === 'session') {
+    draft.apiKeyStorageMode = source.apiKeyStorageMode
+  }
+  if (typeof source.requestTimeoutMs === 'number') draft.requestTimeoutMs = source.requestTimeoutMs
+  if (typeof source.maxContextItemChars === 'number') {
+    draft.maxContextItemChars = source.maxContextItemChars
+  }
+  if (typeof source.maxTotalContextChars === 'number') {
+    draft.maxTotalContextChars = source.maxTotalContextChars
+  }
+  if (typeof source.systemPrompt === 'string') draft.systemPrompt = source.systemPrompt
+
+  const models = Array.isArray(source.models)
+    ? source.models.filter((model): model is string => typeof model === 'string')
+    : []
+  const vision = new Set(
+    Array.isArray(source.visionModels)
+      ? source.visionModels.filter((model): model is string => typeof model === 'string')
+      : [],
+  )
+  modelRows.value = models.length
+    ? models.map((name) => ({ name, vision: vision.has(name) }))
+    : [{ name: '', vision: false }]
+  persistentStorageConfirmed.value = draft.apiKeyStorageMode === 'local'
+}
 </script>
 
 <template>
@@ -129,8 +218,20 @@ function submit(): void {
         <p class="eyebrow">OpenAI-compatible</p>
         <h2 id="settings-heading">Agent settings</h2>
       </div>
-      <button class="text-button" type="button" @click="$emit('close')">Close</button>
+      <div class="header-actions">
+        <button class="text-button" type="button" @click="triggerImport">Import</button>
+        <button class="text-button" type="button" @click="exportSettings">Export</button>
+        <button class="text-button" type="button" @click="$emit('close')">Close</button>
+      </div>
+      <input
+        ref="importInput"
+        hidden
+        type="file"
+        accept="application/json,.json"
+        @change="importSettings"
+      />
     </header>
+    <p v-if="importError" class="import-error" role="alert">{{ importError }}</p>
 
     <form @submit.prevent="submit">
       <label>
@@ -245,7 +346,7 @@ function submit(): void {
           </label>
           <label>
             <span>System instruction <small>optional</small></span>
-            <textarea v-model="draft.systemPrompt" rows="4" />
+            <textarea v-model="draft.systemPrompt" rows="8" />
           </label>
         </div>
       </details>
@@ -306,6 +407,18 @@ header {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.import-error {
+  margin: -0.5rem 0 0.5rem;
+  color: var(--danger);
+  font-size: 0.74rem;
 }
 
 .eyebrow,

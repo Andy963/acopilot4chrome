@@ -8,10 +8,12 @@ Acopilot4chrome is a Chrome 116+ side-panel extension that sends only user-selec
 - Extract readable text from the current page on explicit request.
 - Review, preview, remove, and clear captured context before sending, including the exact next-request truncation or omission caused by the total context limit.
 - Captured context is attached to the question you send it with: it appears at the top of that message and the staging area clears afterward, so each question owns its own context.
-- Set a **Context window** above the conversation to control how many of your recent messages and their replies are resent as history (default 4 turns; older turns are omitted from the request).
-- Configure an OpenAI-compatible base URL, API key, and one or more model names (switch the active model from the side-panel header). Mark a model as **Vision** to enable image input for it. Requests use `Authorization: Bearer <key>` and the standard `chat/completions` path automatically.
+- Set a **Context window** on the Page context row to control how many of your recent messages and their replies are resent as history (default 4 turns; older turns are omitted from the request).
+- Configure an OpenAI-compatible base URL, API key, and one or more model names (switch the active model from the composer toolbar). Mark a model as **Vision** to enable image input for it. Requests use `Authorization: Bearer <key>` and the standard `chat/completions` path automatically.
+- Export and import your agent settings as a JSON file (the API key is never included).
 - Attach images to a question when the active model is vision-capable — paste them into the composer (including "Copy image" from a page) or use the attach button. They are sent as `image_url` parts alongside your text.
-- Stream Markdown responses, cancel active requests, and restore the active browser-session conversation.
+- Stream Markdown (including LaTeX math via `$…$` and `$$…$$`) responses, cancel active requests, and restore the active browser-session conversation.
+- Failed requests retry automatically up to 3 times; if they still fail, a **Retry** button re-runs the request and a successful retry removes the failed reply.
 - Keep API keys session-only by default, with an explicit local persistence option.
 - Optionally sync your settings (base URL, models, system instruction — never the API key) across Chrome via your Google account. Off by default; turning it off changes nothing else.
 

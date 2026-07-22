@@ -10,6 +10,7 @@ const props = defineProps<{
   items: readonly ContextItem[]
   captureAction: 'selection' | 'page' | null
   maxTotalContextChars: number
+  historyWindow: number
 }>()
 
 defineEmits<{
@@ -17,6 +18,7 @@ defineEmits<{
   capturePage: []
   clear: []
   remove: [id: string]
+  historyWindowChange: [value: number]
 }>()
 
 const requestProjection = computed(() => {
@@ -72,9 +74,24 @@ const totalLimitWarning = computed(() => {
   <section class="context-section" aria-labelledby="context-heading">
     <div class="section-heading">
       <h2 id="context-heading">Page context</h2>
-      <button v-if="items.length" class="text-button" type="button" @click="$emit('clear')">
-        Clear all
-      </button>
+      <div class="heading-actions">
+        <label class="window-control" title="How many recent message turns are resent as history">
+          <span>Window</span>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            :value="historyWindow"
+            aria-label="Context window: recent message turns kept as history"
+            @change="
+              $emit('historyWindowChange', Number(($event.target as HTMLInputElement).value))
+            "
+          />
+        </label>
+        <button v-if="items.length" class="text-button" type="button" @click="$emit('clear')">
+          Clear all
+        </button>
+      </div>
     </div>
 
     <div class="capture-actions" aria-label="Capture page context">
@@ -129,6 +146,32 @@ h2,
 
 h2 {
   font-size: 0.9rem;
+}
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.window-control {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.window-control input {
+  width: 3rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
 }
 
 button {

@@ -5,11 +5,14 @@ const props = defineProps<{
   active: boolean
   disabled: boolean
   multimodal: boolean
+  models: readonly string[]
+  activeModel?: string | undefined
 }>()
 
 const emit = defineEmits<{
   send: [question: string, images: string[]]
   cancel: []
+  selectModel: [model: string]
 }>()
 
 interface Attachment {
@@ -181,16 +184,32 @@ watch(
             title="Attach image"
             @click="pickFiles"
           >
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path
-                d="M12 5v14M5 12h14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2.5" />
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+              <path d="M21 15l-4.5-4.5L5 21" />
             </svg>
           </button>
+          <select
+            v-if="models.length > 1"
+            class="model-select"
+            :value="activeModel ?? models[0] ?? ''"
+            :disabled="disabled"
+            aria-label="Active model"
+            @change="$emit('selectModel', ($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
+          </select>
           <span class="hint">Enter to send · Shift+Enter for a new line</span>
         </div>
 
@@ -358,6 +377,24 @@ textarea::placeholder {
   font-size: 0.66rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-select {
+  flex: none;
+  max-width: 9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.model-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .attach {

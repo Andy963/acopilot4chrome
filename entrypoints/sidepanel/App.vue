@@ -49,6 +49,7 @@ const appError = ref<string | null>(null)
 const messageList = ref<HTMLElement>()
 const syncEnabled = ref(false)
 const historyWindow = ref(DEFAULT_HISTORY_WINDOW)
+const pinnedToBottom = ref(true)
 
 let sessionId = createId()
 let sessionCreatedAt = Date.now()
@@ -244,6 +245,7 @@ async function setSync(enabled: boolean): Promise<void> {
 }
 
 async function submitQuestion(question: string, images: string[]): Promise<void> {
+  pinnedToBottom.value = true
   const sent = await chatStore.send(
     question,
     profileStore.profile.value,
@@ -256,13 +258,25 @@ async function submitQuestion(question: string, images: string[]): Promise<void>
   if (sent) await contextStore.clear()
 }
 
-async function updateHistoryWindow(event: Event): Promise<void> {
-  const value = clampHistoryWindow(Number((event.target as HTMLInputElement).value))
-  historyWindow.value = value
+async function retryLast(): Promise<void> {
+  pinnedToBottom.value = true
+  await chatStore.retry(profileStore.profile.value)
+}
+
+async function updateHistoryWindow(value: number): Promise<void> {
+  const clamped = clampHistoryWindow(value)
+  historyWindow.value = clamped
   try {
-    await preferences.setHistoryWindow(value)
+    await preferences.setHistoryWindow(clamped)
   } catch (error) {
     appError.value = safeErrorMessage(error, 'Unable to save the history window.')
+  }
+}
+
+function onMessagesScroll(): void {
+  const element = messageList.value
+  if (element) {
+    pinnedToBottom.value = element.scrollHeight - element.scrollTop - element.clientHeight <= 48
   }
 }
 
@@ -318,7 +332,13 @@ function safeErrorMessage(error: unknown, fallback: string): string {
 watch(
   () => chatStore.state.messages.map((message) => `${message.id}:${message.content.length}`),
   () => {
-    void nextTick(() => messageList.value?.scrollTo({ top: messageList.value.scrollHeight }))
+    // Follow streaming output only while the user is parked at the bottom; if
+    // they scroll up to read, stop yanking the view down.
+    if (!pinnedToBottom.value) return
+    void nextTick(() => {
+      const element = messageList.value
+      if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'instant' })
+    })
   },
 )
 
@@ -356,25 +376,29 @@ onBeforeUnmount(() => {
           <span>{{ profileStore.profile.value?.name ?? 'No agent configured' }}</span>
         </div>
         <div class="header-actions">
-          <select
-            v-if="(profileStore.profile.value?.models?.length ?? 0) > 1"
-            class="model-select"
-            :value="
-              profileStore.profile.value?.model ?? profileStore.profile.value?.models?.[0] ?? ''
-            "
-            aria-label="Active model"
-            @change="profileStore.selectModel(($event.target as HTMLSelectElement).value)"
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Open Agent settings"
+            title="Settings"
+            @click="settingsVisible = true"
           >
-            <option
-              v-for="model in profileStore.profile.value?.models ?? []"
-              :key="model"
-              :value="model"
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
             >
-              {{ model }}
-            </option>
-          </select>
-          <button type="button" aria-label="Open Agent settings" @click="settingsVisible = true">
-            Settings
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+              />
+            </svg>
           </button>
         </div>
       </header>
@@ -389,32 +413,24 @@ onBeforeUnmount(() => {
       <ContextList
         :items="contextStore.state.items"
         :capture-action="contextStore.state.captureAction"
+        :history-window="historyWindow"
         :max-total-context-chars="
           profileStore.profile.value?.maxTotalContextChars ?? DEFAULT_MAX_TOTAL_CONTEXT_CHARS
         "
         @capture-selection="contextStore.capture('selection')"
         @capture-page="contextStore.capture('page')"
+        @history-window-change="updateHistoryWindow"
         @clear="contextStore.clear"
         @remove="contextStore.remove"
       />
 
-      <div class="history-window">
-        <label for="history-window">Context window</label>
-        <input
-          id="history-window"
-          type="number"
-          min="1"
-          max="50"
-          :value="historyWindow"
-          aria-describedby="history-window-hint"
-          @change="updateHistoryWindow"
-        />
-        <span id="history-window-hint" class="history-window__hint">
-          last {{ historyWindow }} of your messages + replies sent
-        </span>
-      </div>
-
-      <section ref="messageList" class="messages" aria-label="Conversation" aria-live="polite">
+      <section
+        ref="messageList"
+        class="messages"
+        aria-label="Conversation"
+        aria-live="polite"
+        @scroll="onMessagesScroll"
+      >
         <p v-if="restoring" class="loading">Restoring session…</p>
         <EmptyState
           v-else-if="!chatStore.state.messages.length"
@@ -422,9 +438,11 @@ onBeforeUnmount(() => {
           description="Captured page text is sent only when you press Send, directly to the configured endpoint."
         />
         <ChatMessage
-          v-for="message in chatStore.state.messages"
+          v-for="(message, index) in chatStore.state.messages"
           :key="message.id"
           :message="message"
+          :can-retry="chatStore.state.canRetry && index === chatStore.state.messages.length - 1"
+          @retry="retryLast"
         />
       </section>
 
@@ -432,7 +450,10 @@ onBeforeUnmount(() => {
         :active="chatStore.active.value"
         :disabled="restoring || !profileStore.profile.value"
         :multimodal="activeModelIsMultimodal"
+        :models="profileStore.profile.value?.models ?? []"
+        :active-model="profileStore.profile.value?.model ?? profileStore.profile.value?.models?.[0]"
         @send="submitQuestion"
+        @select-model="profileStore.selectModel"
         @cancel="chatStore.cancel"
       />
     </template>
@@ -564,16 +585,10 @@ summary:focus-visible {
   gap: 0.4rem;
 }
 
-.model-select {
-  max-width: 8rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.4rem;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.72rem;
+.app-header .icon-button {
+  display: grid;
+  place-items: center;
+  padding: 0.35rem;
 }
 
 .banner {
@@ -588,38 +603,6 @@ summary:focus-visible {
 .banner--error {
   background: var(--danger-soft);
   color: var(--danger);
-}
-
-.history-window {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.history-window label {
-  font-weight: 650;
-}
-
-.history-window input {
-  width: 3.5rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.4rem;
-  padding: 0.2rem 0.35rem;
-  background: var(--surface-raised);
-  color: var(--text);
-  font: inherit;
-}
-
-.history-window__hint {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .messages {

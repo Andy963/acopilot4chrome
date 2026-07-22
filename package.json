@@ -1,6 +1,6 @@
 {
   "name": "acopilot4chrome",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Chrome side-panel AI copilot for any OpenAI-compatible endpoint — bring your own key, chat with page context",
   "private": true,
   "type": "module",
@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
+    "@vscode/markdown-it-katex": "^1.1.2",
+    "katex": "^0.18.1",
     "markdown-it": "14.1.0",
     "vue": "3.5.40"
   },

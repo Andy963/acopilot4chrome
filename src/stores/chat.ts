@@ -1,11 +1,14 @@
 import { computed, reactive, readonly } from 'vue'
 
-import type { AgentAdapter, AgentProfile } from '../agent/adapter'
+import type { AgentAdapter, AgentMessage, AgentProfile, AgentRequest } from '../agent/adapter'
+import type { AgentError } from '../agent/errors'
 import { buildPromptMessages } from '../context/prompt-builder'
 import { applyTotalContextLimit } from '../context/truncate'
 import type { ChatMessage, ChatSession, ContextItem } from '../context/types'
 
 export type ChatPhase = 'idle' | 'validating' | 'requesting' | 'streaming' | 'failed'
+
+const MAX_ATTEMPTS = 3
 
 export interface ChatStoreDependencies {
   adapter: AgentAdapter
@@ -13,6 +16,7 @@ export interface ChatStoreDependencies {
   persist(messages: readonly ChatMessage[]): Promise<void>
   createId(): string
   now(): number
+  delay?(ms: number): Promise<void>
 }
 
 export function createChatStore(dependencies: ChatStoreDependencies) {
@@ -20,9 +24,14 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     messages: [] as ChatMessage[],
     phase: 'idle' as ChatPhase,
     error: null as string | null,
+    canRetry: false,
   })
   let abortController: AbortController | null = null
+  let cancelledManually = false
+  let lastPrompt: AgentMessage[] | null = null
 
+  const delay =
+    dependencies.delay ?? ((ms: number) => new Promise<void>((r) => globalThis.setTimeout(r, ms)))
   const active = computed(() => ['validating', 'requesting', 'streaming'].includes(state.phase))
 
   function hydrate(session: ChatSession | null): void {
@@ -37,6 +46,8 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     )
     state.phase = 'idle'
     state.error = null
+    state.canRetry = false
+    lastPrompt = null
   }
 
   async function send(
@@ -56,6 +67,8 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
 
     state.phase = 'validating'
     state.error = null
+    state.canRetry = false
+    lastPrompt = null
     const apiKey = await dependencies.loadApiKey(profile)
     if (!apiKey) {
       state.error = 'Enter an API key in Agent settings.'
@@ -93,48 +106,140 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     }
     state.messages.push(userMessage, assistantMessage)
     const assistantIndex = state.messages.length - 1
+    lastPrompt = messages
     await persist()
 
-    const controller = new AbortController()
-    abortController = controller
-    state.phase = 'requesting'
-    try {
-      const stream = dependencies.adapter.stream({ profile, apiKey, messages }, controller.signal)
-      for await (const event of stream) {
-        if (event.type === 'content-delta') {
-          state.phase = 'streaming'
-          state.messages[assistantIndex]!.content += event.text
-          await persist()
-        } else if (event.type === 'error') {
-          throw new Error(event.error.message)
-        } else if (event.type === 'completed') {
-          state.messages[assistantIndex]!.status = 'complete'
+    const result = await streamRequest(assistantIndex, { profile, apiKey, messages })
+    if (result !== 'error') lastPrompt = null
+    return result === 'ok'
+  }
+
+  async function retry(profile: AgentProfile | null): Promise<boolean> {
+    if (active.value || !lastPrompt) return false
+    if (!profile) {
+      state.error = 'Configure an agent before sending a message.'
+      state.phase = 'failed'
+      return false
+    }
+
+    state.phase = 'validating'
+    state.error = null
+    state.canRetry = false
+    const apiKey = await dependencies.loadApiKey(profile)
+    if (!apiKey) {
+      state.error = 'Enter an API key in Agent settings.'
+      state.phase = 'failed'
+      state.canRetry = true
+      return false
+    }
+
+    // Drop the failed/cancelled reply so a successful retry doesn't leave a
+    // dead "Response failed" bubble behind.
+    const last = state.messages[state.messages.length - 1]
+    if (
+      last &&
+      last.role === 'assistant' &&
+      (last.status === 'error' || last.status === 'cancelled')
+    ) {
+      state.messages.pop()
+    }
+    const assistantMessage: ChatMessage = {
+      id: dependencies.createId(),
+      role: 'assistant',
+      content: '',
+      createdAt: dependencies.now(),
+      status: 'streaming',
+    }
+    state.messages.push(assistantMessage)
+    const assistantIndex = state.messages.length - 1
+    await persist()
+
+    const result = await streamRequest(assistantIndex, { profile, apiKey, messages: lastPrompt })
+    if (result !== 'error') lastPrompt = null
+    return result === 'ok'
+  }
+
+  /**
+   * Stream one request into the assistant message at `assistantIndex`, retrying
+   * retryable failures up to MAX_ATTEMPTS. Each attempt starts from empty text.
+   */
+  async function streamRequest(
+    assistantIndex: number,
+    request: AgentRequest,
+  ): Promise<'ok' | 'cancelled' | 'error'> {
+    cancelledManually = false
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const message = state.messages[assistantIndex]!
+      message.content = ''
+      message.status = 'streaming'
+      const controller = new AbortController()
+      abortController = controller
+      state.phase = 'requesting'
+
+      let streamError: AgentError | null = null
+      try {
+        for await (const event of dependencies.adapter.stream(request, controller.signal)) {
+          if (event.type === 'content-delta') {
+            state.phase = 'streaming'
+            message.content += event.text
+            await persist()
+          } else if (event.type === 'error') {
+            streamError = event.error
+            break
+          } else if (event.type === 'completed') {
+            message.status = 'complete'
+          }
         }
+      } catch (error) {
+        streamError = controller.signal.aborted
+          ? { code: 'CANCELLED', message: 'The request was cancelled.', retryable: false }
+          : {
+              code: 'NETWORK_ERROR',
+              message: safeErrorMessage(error, 'The agent request failed.'),
+              retryable: true,
+            }
+      } finally {
+        abortController = null
       }
 
-      if (state.messages[assistantIndex]!.status === 'streaming') {
-        state.messages[assistantIndex]!.status = 'complete'
-      }
-      state.phase = 'idle'
-      await persist()
-      return true
-    } catch (error) {
-      if (controller.signal.aborted) {
-        state.messages[assistantIndex]!.status = 'cancelled'
-        state.phase = 'idle'
-      } else {
-        state.messages[assistantIndex]!.status = 'error'
-        state.error = safeErrorMessage(error, 'The agent request failed.')
+      if (streamError) {
+        if (streamError.code === 'CANCELLED' || controller.signal.aborted || cancelledManually) {
+          message.status = 'cancelled'
+          state.phase = 'idle'
+          await persist()
+          return 'cancelled'
+        }
+        if (streamError.retryable && attempt < MAX_ATTEMPTS) {
+          await delay(400 * attempt)
+          if (cancelledManually) {
+            message.status = 'cancelled'
+            state.phase = 'idle'
+            await persist()
+            return 'cancelled'
+          }
+          continue
+        }
+        message.status = 'error'
+        state.error = streamError.message
         state.phase = 'failed'
+        state.canRetry = true
+        await persist()
+        return 'error'
       }
+
+      if (message.status === 'streaming') message.status = 'complete'
+      state.phase = 'idle'
+      state.canRetry = false
       await persist()
-      return false
-    } finally {
-      abortController = null
+      return 'ok'
     }
+
+    return 'error'
   }
 
   function cancel(): void {
+    cancelledManually = true
     abortController?.abort()
   }
 
@@ -143,6 +248,8 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     state.messages = []
     state.phase = 'idle'
     state.error = null
+    state.canRetry = false
+    lastPrompt = null
     await persist()
   }
 
@@ -159,6 +266,7 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     active,
     hydrate,
     send,
+    retry,
     cancel,
     clear,
   }

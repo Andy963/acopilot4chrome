@@ -1,12 +1,19 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-v-html -- MarkdownIt disables raw HTML and validates links. */
+import markdownItKatex from '@vscode/markdown-it-katex'
 import MarkdownIt from 'markdown-it'
 import { computed } from 'vue'
+import 'katex/dist/katex.min.css'
 
 import type { ChatMessage } from '../context/types'
 
 const props = defineProps<{
   message: ChatMessage
+  canRetry?: boolean
+}>()
+
+defineEmits<{
+  retry: []
 }>()
 
 const markdown = new MarkdownIt({
@@ -15,6 +22,8 @@ const markdown = new MarkdownIt({
   linkify: true,
   typographer: false,
 })
+
+markdown.use(markdownItKatex, { throwOnError: false })
 
 markdown.validateLink = (url) => /^(https?:|mailto:)/i.test(url)
 markdown.renderer.rules.link_open = (tokens, index, options, _environment, renderer) => {
@@ -96,13 +105,14 @@ async function copyCode(event: MouseEvent): Promise<void> {
         <span class="typing-dot" />
         <span class="typing-dot" />
       </div>
-      <p
-        v-if="message.status === 'error' || message.status === 'cancelled'"
-        class="status"
-        :class="`status--${message.status}`"
-      >
-        {{ message.status === 'error' ? 'Response failed' : 'Cancelled' }}
-      </p>
+      <div v-if="message.status === 'error' || message.status === 'cancelled'" class="status-row">
+        <p class="status" :class="`status--${message.status}`">
+          {{ message.status === 'error' ? 'Response failed' : 'Cancelled' }}
+        </p>
+        <button v-if="canRetry" type="button" class="retry-button" @click="$emit('retry')">
+          Retry
+        </button>
+      </div>
     </template>
   </article>
 </template>
@@ -248,6 +258,12 @@ async function copyCode(event: MouseEvent): Promise<void> {
   }
 }
 
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .status {
   margin: 0.4rem 0 0;
   font-size: 0.7rem;
@@ -260,6 +276,24 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 .status--cancelled {
   color: var(--muted);
+}
+
+.retry-button {
+  margin-top: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.retry-button:hover,
+.retry-button:focus-visible {
+  border-color: var(--accent);
 }
 
 .plain-content {
@@ -315,5 +349,12 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 .markdown-content :deep(a) {
   color: var(--accent);
+}
+
+.markdown-content :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.5rem 0;
+  padding: 0.15rem 0;
 }
 </style>
