@@ -162,16 +162,21 @@ watch(
         </li>
       </ul>
 
-      <textarea
-        id="question"
-        ref="input"
-        v-model="question"
-        rows="3"
-        placeholder="Ask a question…"
-        :disabled="disabled"
-        @keydown="handleKeydown"
-        @paste="handlePaste"
-      />
+      <div class="input-wrap">
+        <textarea
+          id="question"
+          ref="input"
+          v-model="question"
+          rows="3"
+          :disabled="disabled"
+          @keydown="handleKeydown"
+          @paste="handlePaste"
+        />
+        <div v-if="!question" class="placeholder" aria-hidden="true">
+          <span class="placeholder__title">Ask a question…</span>
+          <span class="placeholder__hint">Enter to send · Shift+Enter for a new line</span>
+        </div>
+      </div>
 
       <div class="toolbar">
         <div class="toolbar-left">
@@ -210,7 +215,6 @@ watch(
           >
             <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
           </select>
-          <span class="hint">Enter to send · Shift+Enter for a new line</span>
         </div>
 
         <button
@@ -265,7 +269,7 @@ watch(
 
 <style scoped>
 .composer {
-  padding: 0.6rem 0.85rem 0.8rem;
+  padding: 0.6rem 0.5rem 0.8rem;
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
@@ -337,6 +341,10 @@ watch(
   cursor: pointer;
 }
 
+.input-wrap {
+  position: relative;
+}
+
 textarea {
   display: block;
   width: 100%;
@@ -353,8 +361,26 @@ textarea {
   line-height: 1.45;
 }
 
-textarea::placeholder {
+.placeholder {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.25rem;
+  left: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  pointer-events: none;
+}
+
+.placeholder__title {
   color: var(--muted);
+  line-height: 1.45;
+}
+
+.placeholder__hint {
+  color: var(--muted);
+  font-size: 0.66rem;
+  opacity: 0.85;
 }
 
 .toolbar {
@@ -369,14 +395,6 @@ textarea::placeholder {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
-}
-
-.hint {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.66rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .model-select {

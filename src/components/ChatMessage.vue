@@ -1,10 +1,9 @@
 <script setup lang="ts">
-/* eslint-disable vue/no-v-html -- MarkdownIt disables raw HTML and validates links. */
-import markdownItKatex from '@vscode/markdown-it-katex'
-import MarkdownIt from 'markdown-it'
+/* eslint-disable vue/no-v-html -- renderMarkdown disables raw HTML and validates links. */
 import { computed } from 'vue'
 import 'katex/dist/katex.min.css'
 
+import { renderMarkdown } from '../context/markdown'
 import type { ChatMessage } from '../context/types'
 
 const props = defineProps<{
@@ -16,33 +15,7 @@ defineEmits<{
   retry: []
 }>()
 
-const markdown = new MarkdownIt({
-  breaks: true,
-  html: false,
-  linkify: true,
-  typographer: false,
-})
-
-markdown.use(markdownItKatex, { throwOnError: false })
-
-markdown.validateLink = (url) => /^(https?:|mailto:)/i.test(url)
-markdown.renderer.rules.link_open = (tokens, index, options, _environment, renderer) => {
-  const token = tokens[index]
-  if (token) {
-    token.attrSet('target', '_blank')
-    token.attrSet('rel', 'noopener noreferrer')
-  }
-  return renderer.renderToken(tokens, index, options)
-}
-const renderFence = markdown.renderer.rules.fence?.bind(markdown.renderer.rules)
-markdown.renderer.rules.fence = (tokens, index, options, environment, renderer) => {
-  const code = renderFence
-    ? renderFence(tokens, index, options, environment, renderer)
-    : renderer.renderToken(tokens, index, options)
-  return `<div class="code-block"><button class="copy-code" type="button">Copy code</button>${code}</div>`
-}
-
-const renderedContent = computed(() => markdown.render(props.message.content))
+const renderedContent = computed(() => renderMarkdown(props.message.content))
 
 async function copyCode(event: MouseEvent): Promise<void> {
   const target = event.target
