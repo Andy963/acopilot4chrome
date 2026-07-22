@@ -59,7 +59,11 @@ markdown.renderer.rules.fence = (tokens, index, options, environment, renderer) 
 
 function normalizeMathDelimiters(content: string): string {
   const normalized = content.replace(/\r\n?/g, '\n').replace(/[\u2028\u2029\u0085]/g, '\n')
-  if (!/\\(?:\(|\[)/.test(normalized) && !/\$\$[\s\S]*\n[\s\S]*\$\$/.test(normalized)) {
+  if (
+    !/\\(?:\(|\[)/.test(normalized) &&
+    !/\$\$[\s\S]*\n[\s\S]*\$\$/.test(normalized) &&
+    !/\\\\[A-Za-z]/.test(normalized)
+  ) {
     return normalized
   }
 
@@ -87,6 +91,13 @@ function normalizeMathDelimiters(content: string): string {
   )
   working = working.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula: string) =>
     formula.includes('\n') ? `\n\n$$\n${formula.trim()}\n$$\n\n` : match,
+  )
+  working = working.replace(
+    /(\${1,2})([\s\S]*?)\1/g,
+    (match, delimiter: string, formula: string) => {
+      const normalizedFormula = formula.replace(/\\\\(?=[A-Za-z])/g, '\\')
+      return `${delimiter}${normalizedFormula}${delimiter}`
+    },
   )
 
   return working.replace(/\uE000ACOPILOT_CODE_(\d+)\uE001/g, (_match, index: string) => {

@@ -22,6 +22,10 @@ describe('renderMarkdown', () => {
 
     const adjacent = renderMarkdown('\\(a\\)\\(b\\)')
     expect(adjacent.match(/class="katex"/g)).toHaveLength(2)
+
+    const escapedCommands = renderMarkdown(String.raw`$W_v^\\top\\tanh(x)$`)
+    expect(escapedCommands).toContain('katex')
+    expect(escapedCommands).not.toContain('katex-error')
   })
 
   it('preserves LaTeX delimiters inside inline and fenced code', () => {
