@@ -1,4 +1,5 @@
 import markdownItKatexDefault from '@vscode/markdown-it-katex'
+import katex from 'katex'
 import MarkdownIt from 'markdown-it'
 import * as markdownItKatexNamespace from '@vscode/markdown-it-katex'
 
@@ -423,8 +424,59 @@ function normalizeMathDelimiters(content: string): string {
   })
 }
 
+function renderNormalizedMath(source: string): string | null {
+  const normalized = normalizeMathDelimiters(source).trim()
+  const displayMatch = normalized.match(/^\$\$([\s\S]+)\$\$$/)
+  const displayFormula = displayMatch?.[1]
+  if (displayFormula !== undefined) {
+    return katex.renderToString(displayFormula.trim(), {
+      throwOnError: false,
+      output: 'html',
+      displayMode: true,
+    })
+  }
+
+  const inlineMatch = normalized.match(/^\$([\s\S]+)\$$/)
+  const inlineFormula = inlineMatch?.[1]
+  if (inlineFormula !== undefined) {
+    return katex.renderToString(inlineFormula.trim(), {
+      throwOnError: false,
+      output: 'html',
+      displayMode: false,
+    })
+  }
+
+  if (/\\[A-Za-z]+|[_^{}=+\-*/<>|]/.test(normalized)) {
+    return katex.renderToString(normalizeFormulaSyntax(normalized), {
+      throwOnError: false,
+      output: 'html',
+      displayMode: false,
+    })
+  }
+
+  return null
+}
+
+function repairKatexErrors(html: string): string {
+  if (!html.includes('katex-error') || typeof document === 'undefined') return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+
+  template.content.querySelectorAll('.katex-error').forEach((node) => {
+    const repaired = renderNormalizedMath(node.textContent || '')
+    if (!repaired || repaired.includes('katex-error')) return
+
+    const wrapper = document.createElement('span')
+    wrapper.innerHTML = repaired
+    node.replaceWith(...Array.from(wrapper.childNodes))
+  })
+
+  return template.innerHTML
+}
+
 /** Render assistant Markdown with normalized LaTeX and inert raw HTML. */
 export function renderMarkdown(content: string): string {
   const normalized = normalizeMathDelimiters(normalizeMarkdownNewlines(content))
-  return markdown.render(normalized)
+  return repairKatexErrors(markdown.render(normalized))
 }

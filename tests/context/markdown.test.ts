@@ -401,6 +401,25 @@ describe('renderMarkdown safety and screenshot regressions', () => {
     expect(el.textContent).not.toContain('sqrtd')
   })
 
+  it('renders additive attention formulas with tanh from the screenshot', () => {
+    const input = String.raw`加性注意力：$score(q,k)=v^T\tanh(W_q q + W_k k)$；点积注意力：$q^T / \sqrtd$`
+    const el = renderToElement(renderMarkdown(input))
+
+    expect(el.querySelectorAll('.katex')).toHaveLength(2)
+    expect(el.querySelectorAll('.katex-error')).toHaveLength(0)
+    expect(el.textContent).not.toContain('\\tanh')
+    expect(el.textContent).not.toContain('sqrtd')
+  })
+
+  it('repairs double-escaped tanh commands before rendering', () => {
+    const input = String.raw`$score(q,k)=v^T\\tanh(W_q q + W_k k)$`
+    const el = renderToElement(renderMarkdown(input))
+
+    expect(el.querySelectorAll('.katex')).toHaveLength(1)
+    expect(el.querySelectorAll('.katex-error')).toHaveLength(0)
+    expect(el.textContent).not.toContain('\\tanh')
+  })
+
   it('preserves math-like delimiters inside inline and fenced code', () => {
     const html = renderMarkdown('`\\(inline\\)`\n\n```tex\n\\[\nx + y\n\\]\n```')
 
