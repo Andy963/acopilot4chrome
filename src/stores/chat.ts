@@ -29,12 +29,14 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
   let abortController: AbortController | null = null
   let cancelledManually = false
   let lastPrompt: AgentMessage[] | null = null
+  let requestGeneration = 0
 
   const delay =
     dependencies.delay ?? ((ms: number) => new Promise<void>((r) => globalThis.setTimeout(r, ms)))
   const active = computed(() => ['validating', 'requesting', 'streaming'].includes(state.phase))
 
   function hydrate(session: ChatSession | null): void {
+    requestGeneration += 1
     state.messages = (session?.messages ?? []).map((message) =>
       message.status === 'streaming'
         ? {
@@ -65,11 +67,13 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       return false
     }
 
+    const generation = ++requestGeneration
     state.phase = 'validating'
     state.error = null
     state.canRetry = false
     lastPrompt = null
     const apiKey = await dependencies.loadApiKey(profile)
+    if (generation !== requestGeneration) return false
     if (!apiKey) {
       state.error = 'Enter an API key in Agent settings.'
       state.phase = 'failed'
@@ -108,9 +112,10 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     const assistantIndex = state.messages.length - 1
     lastPrompt = messages
     await persist()
+    if (generation !== requestGeneration) return false
 
-    const result = await streamRequest(assistantIndex, { profile, apiKey, messages })
-    if (result !== 'error') lastPrompt = null
+    const result = await streamRequest(assistantIndex, { profile, apiKey, messages }, generation)
+    if (generation === requestGeneration && result !== 'error') lastPrompt = null
     return result === 'ok'
   }
 
@@ -122,16 +127,21 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       return false
     }
 
+    const generation = ++requestGeneration
     state.phase = 'validating'
     state.error = null
     state.canRetry = false
     const apiKey = await dependencies.loadApiKey(profile)
+    if (generation !== requestGeneration) return false
     if (!apiKey) {
       state.error = 'Enter an API key in Agent settings.'
       state.phase = 'failed'
       state.canRetry = true
       return false
     }
+
+    const prompt = lastPrompt
+    if (!prompt) return false
 
     // Drop the failed/cancelled reply so a successful retry doesn't leave a
     // dead "Response failed" bubble behind.
@@ -153,9 +163,14 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     state.messages.push(assistantMessage)
     const assistantIndex = state.messages.length - 1
     await persist()
+    if (generation !== requestGeneration) return false
 
-    const result = await streamRequest(assistantIndex, { profile, apiKey, messages: lastPrompt })
-    if (result !== 'error') lastPrompt = null
+    const result = await streamRequest(
+      assistantIndex,
+      { profile, apiKey, messages: prompt },
+      generation,
+    )
+    if (generation === requestGeneration && result !== 'error') lastPrompt = null
     return result === 'ok'
   }
 
@@ -166,11 +181,14 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
   async function streamRequest(
     assistantIndex: number,
     request: AgentRequest,
+    generation: number,
   ): Promise<'ok' | 'cancelled' | 'error'> {
     cancelledManually = false
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const message = state.messages[assistantIndex]!
+      if (generation !== requestGeneration) return 'cancelled'
+      const message = state.messages[assistantIndex]
+      if (!message) return 'cancelled'
       message.content = ''
       message.status = 'streaming'
       const controller = new AbortController()
@@ -180,10 +198,12 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       let streamError: AgentError | null = null
       try {
         for await (const event of dependencies.adapter.stream(request, controller.signal)) {
+          if (generation !== requestGeneration) return 'cancelled'
           if (event.type === 'content-delta') {
             state.phase = 'streaming'
             message.content += event.text
             await persist()
+            if (generation !== requestGeneration) return 'cancelled'
           } else if (event.type === 'error') {
             streamError = event.error
             break
@@ -200,22 +220,27 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
               retryable: true,
             }
       } finally {
-        abortController = null
+        if (abortController === controller) abortController = null
       }
+
+      if (generation !== requestGeneration) return 'cancelled'
 
       if (streamError) {
         if (streamError.code === 'CANCELLED' || controller.signal.aborted || cancelledManually) {
           message.status = 'cancelled'
           state.phase = 'idle'
           await persist()
+          if (generation !== requestGeneration) return 'cancelled'
           return 'cancelled'
         }
         if (streamError.retryable && attempt < MAX_ATTEMPTS) {
           await delay(400 * attempt)
+          if (generation !== requestGeneration) return 'cancelled'
           if (cancelledManually) {
             message.status = 'cancelled'
             state.phase = 'idle'
             await persist()
+            if (generation !== requestGeneration) return 'cancelled'
             return 'cancelled'
           }
           continue
@@ -225,6 +250,7 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
         state.phase = 'failed'
         state.canRetry = true
         await persist()
+        if (generation !== requestGeneration) return 'cancelled'
         return 'error'
       }
 
@@ -232,6 +258,7 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
       state.phase = 'idle'
       state.canRetry = false
       await persist()
+      if (generation !== requestGeneration) return 'cancelled'
       return 'ok'
     }
 
@@ -244,6 +271,7 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
   }
 
   async function clear(): Promise<void> {
+    requestGeneration += 1
     if (active.value) cancel()
     state.messages = []
     state.phase = 'idle'

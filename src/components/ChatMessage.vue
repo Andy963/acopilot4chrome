@@ -17,21 +17,47 @@ defineEmits<{
 
 const renderedContent = computed(() => renderMarkdown(props.message.content))
 
+const COPY_BUTTON_ICONS = {
+  copy: '<rect x="9" y="9" width="10" height="10" rx="1.5"/><path d="M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9"/>',
+  copied: '<path d="m5 12 4 4L19 6"/>',
+  failed: '<path d="m7 7 10 10M17 7 7 17"/>',
+} as const
+
+const COPY_BUTTON_LABELS = {
+  copy: 'Copy code',
+  copied: 'Copied',
+  failed: 'Copy failed',
+} as const
+
+type CopyButtonState = keyof typeof COPY_BUTTON_ICONS
+
+function setCopyButtonState(button: HTMLButtonElement, state: CopyButtonState): void {
+  const icon = button.querySelector('svg')
+  if (icon) icon.innerHTML = COPY_BUTTON_ICONS[state]
+  button.dataset.copyState = state
+  button.setAttribute('aria-label', COPY_BUTTON_LABELS[state])
+  button.title = COPY_BUTTON_LABELS[state]
+}
+
 async function copyCode(event: MouseEvent): Promise<void> {
   const target = event.target
-  if (!(target instanceof HTMLButtonElement) || !target.matches('.copy-code')) return
+  if (!(target instanceof Element)) return
 
-  const code = target.parentElement?.querySelector('pre code')
+  const button = target.closest<HTMLButtonElement>('.copy-code')
+  const container = event.currentTarget
+  if (!(container instanceof Element) || !button || !container.contains(button)) return
+
+  const code = button.closest('.code-block')?.querySelector('pre code')
   if (!code) return
 
   try {
     await navigator.clipboard.writeText(code.textContent ?? '')
-    target.textContent = 'Copied'
+    setCopyButtonState(button, 'copied')
     window.setTimeout(() => {
-      target.textContent = 'Copy code'
+      if (button.isConnected) setCopyButtonState(button, 'copy')
     }, 1200)
   } catch {
-    target.textContent = 'Copy failed'
+    setCopyButtonState(button, 'failed')
   }
 }
 </script>
@@ -321,18 +347,44 @@ async function copyCode(event: MouseEvent): Promise<void> {
 }
 
 .markdown-content :deep(.copy-code) {
+  display: grid;
+  place-items: center;
   position: absolute;
   z-index: 1;
   top: 0.35rem;
   right: 0.4rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.35rem;
-  padding: 0.25rem 0.4rem;
+  padding: 0.25rem;
   background: var(--surface-raised);
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 0.65rem;
+  font-size: 0;
+}
+
+.markdown-content :deep(.copy-code:hover),
+.markdown-content :deep(.copy-code:focus-visible) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.markdown-content :deep(.copy-code[data-copy-state='copied']) {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.markdown-content :deep(.copy-code[data-copy-state='failed']) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.markdown-content :deep(.copy-code svg) {
+  display: block;
+  width: 1rem;
+  height: 1rem;
 }
 
 .markdown-content :deep(a) {

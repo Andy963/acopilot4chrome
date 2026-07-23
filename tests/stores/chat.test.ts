@@ -168,6 +168,67 @@ describe('chat store', () => {
     expect(store.state.messages[0]?.contextItems?.map((item) => item.id)).toEqual(['context-1'])
   })
 
+  it('clears the conversation and does not resend cleared history', async () => {
+    const requests: AgentRequest[] = []
+    const store = createChatStore({
+      adapter: {
+        testConnection: vi.fn(),
+        async *stream(request): AsyncIterable<AgentStreamEvent> {
+          requests.push(request)
+          yield { type: 'completed' }
+        },
+      },
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+    })
+
+    await store.send('First question', profile, [])
+    await store.clear()
+    expect(store.state.messages).toEqual([])
+
+    await store.send('Second question', profile, [])
+
+    expect(requests).toHaveLength(2)
+    expect(requests[1]?.messages).toEqual([
+      expect.objectContaining({ role: 'system' }),
+      expect.objectContaining({
+        role: 'user',
+        content: expect.stringContaining('Second question'),
+      }),
+    ])
+    expect(JSON.stringify(requests[1]?.messages)).not.toContain('First question')
+  })
+
+  it('invalidates an in-flight stream when the conversation is cleared', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const store = createChatStore({
+      adapter: {
+        testConnection: vi.fn(),
+        async *stream(): AsyncIterable<AgentStreamEvent> {
+          await gate
+          yield { type: 'completed' }
+        },
+      },
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+    })
+
+    const request = store.send('Question to clear', profile, [])
+    await vi.waitFor(() => expect(store.active.value).toBe(true))
+    await store.clear()
+    release?.()
+
+    expect(await request).toBe(false)
+    expect(store.state.messages).toEqual([])
+  })
+
   it('retries retryable failures up to three attempts and then succeeds', async () => {
     let attempts = 0
     const adapter: AgentAdapter = {

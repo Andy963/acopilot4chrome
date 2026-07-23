@@ -17,4 +17,10 @@ describe('ChatMessage Markdown rendering', () => {
     expect(chatMessageSource).toContain('v-else-if="message.content"')
     expect(chatMessageSource).toContain('class="markdown-content"')
   })
+
+  it('uses an icon-only copy control that also handles clicks on the icon', () => {
+    expect(chatMessageSource).toContain("target.closest<HTMLButtonElement>('.copy-code')")
+    expect(chatMessageSource).toContain('COPY_BUTTON_ICONS')
+    expect(chatMessageSource).toContain("button.setAttribute('aria-label'")
+  })
 })

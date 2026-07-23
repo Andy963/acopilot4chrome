@@ -240,6 +240,19 @@ async function deleteProfile(): Promise<void> {
   }
 }
 
+async function clearConversation(): Promise<void> {
+  await chatStore.clear()
+  await nextTick()
+
+  const element = messageList.value
+  if (!element) return
+
+  element.scrollTop = 0
+  lastMessageListScrollTop = 0
+  programmaticScrollTop = null
+  followingOutput.value = true
+}
+
 async function setSync(enabled: boolean): Promise<void> {
   if (enabled === syncEnabled.value) return
   try {
@@ -438,6 +451,28 @@ onBeforeUnmount(() => {
           <span>{{ profileStore.profile.value?.name ?? 'No agent configured' }}</span>
         </div>
         <div class="header-actions">
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Clear conversation"
+            title="Clear conversation"
+            :disabled="restoring || (!chatStore.state.messages.length && !chatStore.active.value)"
+            @click="clearConversation"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6" />
+            </svg>
+          </button>
           <button
             type="button"
             class="icon-button"
@@ -640,6 +675,17 @@ summary:focus-visible {
   cursor: pointer;
   font: inherit;
   font-size: 0.75rem;
+}
+
+.app-header button:hover:not(:disabled),
+.app-header button:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.app-header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .header-actions {

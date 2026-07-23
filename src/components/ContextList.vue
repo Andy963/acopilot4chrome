@@ -95,18 +95,28 @@ const totalLimitWarning = computed(() => {
     </div>
 
     <div class="capture-actions" aria-label="Capture page context">
-      <button type="button" :disabled="captureAction !== null" @click="$emit('captureSelection')">
+      <button
+        type="button"
+        class="capture-button capture-button--selection"
+        data-tooltip="Capture the text currently selected on the active page."
+        title="Capture selected text"
+        :disabled="captureAction !== null"
+        @click="$emit('captureSelection')"
+      >
         {{ captureAction === 'selection' ? 'Adding…' : 'Add selection' }}
       </button>
-      <button type="button" :disabled="captureAction !== null" @click="$emit('capturePage')">
+      <button
+        type="button"
+        class="capture-button capture-button--page"
+        data-tooltip="Extract the readable text from the active page."
+        title="Capture current page"
+        :disabled="captureAction !== null"
+        @click="$emit('capturePage')"
+      >
         {{ captureAction === 'page' ? 'Adding…' : 'Add current page' }}
       </button>
     </div>
 
-    <p v-if="!items.length" class="empty-copy">
-      Nothing is captured automatically. Add a selection or the current page when you want to use
-      it.
-    </p>
     <p v-if="items.length && totalLimitAffectsRequest" class="limit-warning" role="status">
       {{ totalLimitWarning }}
     </p>
@@ -139,7 +149,6 @@ const totalLimitWarning = computed(() => {
 }
 
 h2,
-.empty-copy,
 .limit-warning {
   margin: 0;
 }
@@ -207,10 +216,67 @@ button:disabled {
   justify-content: flex-start;
 }
 
-.empty-copy {
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.4;
+.capture-button {
+  position: relative;
+  border-color: color-mix(in srgb, var(--capture-color) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--capture-color) 12%, var(--surface-raised));
+  color: color-mix(in srgb, var(--capture-color) 78%, var(--text));
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.capture-button--selection {
+  --capture-color: #536dcc;
+}
+
+.capture-button--page {
+  --capture-color: #c1772d;
+}
+
+.capture-button:hover:not(:disabled),
+.capture-button:focus-visible {
+  border-color: var(--capture-color);
+  background: color-mix(in srgb, var(--capture-color) 20%, var(--surface-raised));
+}
+
+.capture-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.capture-button::after {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.45rem);
+  left: 50%;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 2rem));
+  padding: 0.42rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.45rem;
+  background: var(--text);
+  color: var(--surface-raised);
+  content: attr(data-tooltip);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -0.2rem);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 120ms ease;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.capture-button:hover::after,
+.capture-button:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
 }
 
 .limit-warning {
