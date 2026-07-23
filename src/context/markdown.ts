@@ -1,67 +1,128 @@
-import markdownItKatexDefault from '@vscode/markdown-it-katex'
+import { marked } from 'marked'
+import markedKatex from 'marked-katex-extension'
 import katex from 'katex'
-import MarkdownIt from 'markdown-it'
-import * as markdownItKatexNamespace from '@vscode/markdown-it-katex'
+import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 
-type MarkdownItPlugin = (md: MarkdownIt, options?: unknown) => void
+const escapeHtmlMinimal = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/**
- * `@vscode/markdown-it-katex` is a CommonJS module (`exports.default = fn`).
- * Depending on the bundler's interop, the imported value can be the function,
- * `{ default: fn }`, or a namespace object — and calling `md.use()` on a
- * non-function throws "x.apply is not a function", which previously blanked the
- * whole message list. Resolve to the actual callable regardless of interop, or
- * null so the caller can skip math and still render plain Markdown.
- */
-function resolveKatexPlugin(): MarkdownItPlugin | null {
-  for (const candidate of [markdownItKatexDefault, markdownItKatexNamespace]) {
-    let value: unknown = candidate
-    for (
-      let depth = 0;
-      depth < 5 && value && typeof value === 'object' && 'default' in value;
-      depth++
-    ) {
-      value = (value as { default: unknown }).default
+const highlightCode = (code: string, lang?: string): string => {
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      return hljs.highlight(code, { language: lang }).value
+    } catch {
+      // fallback below
     }
-    if (typeof value === 'function') return value as MarkdownItPlugin
   }
-  return null
+  try {
+    return hljs.highlightAuto(code).value
+  } catch {
+    return ''
+  }
 }
 
-const markdown = new MarkdownIt({
+const COPY_BUTTON_HTML =
+  '<button class="copy-code" aria-label="Copy code"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="9" width="10" height="10" rx="1.5"/><path d="M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9"/></svg></button>'
+
+const renderCodeBlock = (
+  codeForHighlight: string,
+  codeForEscape: string,
+  lang?: string,
+): string => {
+  const highlighted = highlightCode(codeForHighlight, lang) || escapeHtmlMinimal(codeForEscape)
+  const langClass = lang ? ` language-${lang}` : ''
+  return `<pre class="hljs${langClass}">${COPY_BUTTON_HTML}<code class="hljs${langClass}">${highlighted}</code></pre>`
+}
+
+marked.setOptions({
   breaks: true,
-  html: false,
-  linkify: true,
-  typographer: false,
+  gfm: true,
 })
 
-// Math rendering is optional: if the KaTeX plugin can't be resolved, keep
-// rendering plain Markdown rather than throwing and blanking the chat.
-const katexPlugin = resolveKatexPlugin()
-if (katexPlugin) {
-  // Match the chat renderer: HTML-only output keeps raw TeX annotations out of
-  // the message text while preserving the visible KaTeX layout.
-  markdown.use(katexPlugin, { throwOnError: false, output: 'html' })
-}
+marked.use({
+  renderer: {
+    code({ text, lang }) {
+      return renderCodeBlock(text.trim(), text, lang)
+    },
+  },
+})
 
-markdown.validateLink = (url) => /^(https?:|mailto:)/i.test(url)
-markdown.renderer.rules.link_open = (tokens, index, options, _environment, renderer) => {
-  const token = tokens[index]
-  if (token) {
-    token.attrSet('target', '_blank')
-    token.attrSet('rel', 'noopener noreferrer')
+marked.use(
+  markedKatex({
+    throwOnError: false,
+    output: 'html',
+  }),
+)
+
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
   }
-  return renderer.renderToken(tokens, index, options)
+})
+
+const SANITIZE_CONFIG = {
+  ADD_TAGS: [
+    'button',
+    'svg',
+    'path',
+    'rect',
+    'br',
+    'math',
+    'semantics',
+    'mrow',
+    'mi',
+    'mn',
+    'mo',
+    'ms',
+    'mtext',
+    'msup',
+    'msub',
+    'msubsup',
+    'mfrac',
+    'msqrt',
+    'mroot',
+    'mover',
+    'munder',
+    'munderover',
+    'mtable',
+    'mtr',
+    'mtd',
+    'mspace',
+    'mphantom',
+    'mstyle',
+    'menclose',
+    'annotation',
+  ],
+  ADD_ATTR: [
+    'aria-label',
+    'aria-hidden',
+    'role',
+    'xmlns',
+    'viewBox',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'x',
+    'y',
+    'width',
+    'height',
+    'rx',
+    'ry',
+    'd',
+    'class',
+    'style',
+    'data-url',
+    'mathvariant',
+    'displaystyle',
+    'scriptlevel',
+    'encoding',
+  ],
 }
 
-const renderFence = markdown.renderer.rules.fence?.bind(markdown.renderer.rules)
-const COPY_CODE_ICON =
-  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="9" width="10" height="10" rx="1.5"/><path d="M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9"/></svg>'
-markdown.renderer.rules.fence = (tokens, index, options, environment, renderer) => {
-  const code = renderFence
-    ? renderFence(tokens, index, options, environment, renderer)
-    : renderer.renderToken(tokens, index, options)
-  return `<div class="code-block"><button class="copy-code" type="button" aria-label="Copy code" title="Copy code">${COPY_CODE_ICON}</button>${code}</div>`
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG)
 }
 
 function normalizeMarkdownNewlines(content: string): string {
@@ -477,6 +538,8 @@ function repairKatexErrors(html: string): string {
 
 /** Render assistant Markdown with normalized LaTeX and inert raw HTML. */
 export function renderMarkdown(content: string): string {
+  if (!content) return ''
   const normalized = normalizeMathDelimiters(normalizeMarkdownNewlines(content))
-  return repairKatexErrors(markdown.render(normalized))
+  const html = marked.parse(normalized) as string
+  return sanitizeHtml(repairKatexErrors(html))
 }

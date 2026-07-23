@@ -1,6 +1,6 @@
 {
   "name": "acopilot4chrome",
-  "version": "0.0.9",
+  "version": "0.0.15",
   "description": "Chrome side-panel AI copilot for any OpenAI-compatible endpoint — bring your own key, chat with page context",
   "private": true,
   "type": "module",
@@ -24,15 +24,16 @@
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
-    "@vscode/markdown-it-katex": "^1.1.2",
+    "dompurify": "^3.4.12",
+    "highlight.js": "^11.11.1",
     "katex": "^0.18.1",
-    "markdown-it": "14.1.0",
+    "marked": "^18.0.7",
+    "marked-katex-extension": "^5.1.10",
     "vue": "3.5.40"
   },
   "devDependencies": {
     "@eslint/js": "9.31.0",
     "@types/chrome": "0.2.2",
-    "@types/markdown-it": "14.1.2",
     "@types/mozilla-readability": "0.2.0",
     "@typescript-eslint/eslint-plugin": "8.38.0",
     "@typescript-eslint/parser": "8.38.0",
