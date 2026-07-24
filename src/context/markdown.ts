@@ -32,7 +32,9 @@ const renderCodeBlock = (
 ): string => {
   const highlighted = highlightCode(codeForHighlight, lang) || escapeHtmlMinimal(codeForEscape)
   const langClass = lang ? ` language-${lang}` : ''
-  return `<pre class="hljs${langClass}">${COPY_BUTTON_HTML}<code class="hljs${langClass}">${highlighted}</code></pre>`
+  // The wrapping .code-block is the positioning + hover context the copy button
+  // (and its ChatMessage click handler's closest('.code-block')) relies on.
+  return `<div class="code-block"><pre class="hljs${langClass}">${COPY_BUTTON_HTML}<code class="hljs${langClass}">${highlighted}</code></pre></div>`
 }
 
 marked.setOptions({

@@ -432,6 +432,7 @@ describe('renderMarkdown safety and screenshot regressions', () => {
     const input = '```js\nconst a = 1\n```\n\n<img src=x onerror=alert(1)>'
     const html = renderMarkdown(input)
 
+    expect(html).toContain('code-block')
     expect(html).toContain('copy-code')
     expect(html).toContain('aria-label="Copy code"')
     expect(html).toContain('<svg')

@@ -24,7 +24,43 @@ const sourceUrl = computed(() => {
 <template>
   <article class="context-card" :data-context-id="item.id">
     <header>
-      <span class="kind">{{ item.kind === 'page' ? 'Page' : 'Selection' }}</span>
+      <span
+        class="kind"
+        :class="`kind--${item.kind}`"
+        :title="item.kind === 'page' ? 'Page context' : 'Selection context'"
+      >
+        <svg
+          v-if="item.kind === 'page'"
+          class="kind-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          role="img"
+          aria-label="Page"
+        >
+          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+          <path d="M16 13H8M16 17H8M10 9H8" />
+        </svg>
+        <svg
+          v-else
+          class="kind-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          role="img"
+          aria-label="Selection"
+        >
+          <rect x="3" y="4.5" width="18" height="15" rx="2" stroke-dasharray="3 2.4" />
+          <path d="M7 10h10M7 14h6" />
+        </svg>
+      </span>
       <button
         class="icon-button"
         type="button"
@@ -72,11 +108,21 @@ header {
 }
 
 .kind {
-  color: var(--accent);
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kind--page {
+  color: var(--context-page);
+}
+
+.kind--selection {
+  color: var(--context-selection);
+}
+
+.kind-icon {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .icon-button {

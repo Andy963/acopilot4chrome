@@ -318,6 +318,66 @@ describe('chat store', () => {
     expect(calls).toBe(1)
     expect(store.state.messages[1]).toMatchObject({ status: 'error' })
   })
+
+  it('regenerates a reply in place, reusing the original question', async () => {
+    const requests: AgentRequest[] = []
+    let call = 0
+    const adapter: AgentAdapter = {
+      testConnection: vi.fn(),
+      async *stream(request: AgentRequest): AsyncIterable<AgentStreamEvent> {
+        requests.push(request)
+        call += 1
+        yield { type: 'content-delta', text: call === 1 ? 'first' : 'second' }
+        yield { type: 'completed' }
+      },
+    }
+    const store = createChatStore({
+      adapter,
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+    })
+
+    expect(await store.send('Question', profile, [])).toBe(true)
+    const userId = store.state.messages[0]!.id
+    expect(store.state.messages[1]).toMatchObject({ content: 'first', status: 'complete' })
+
+    expect(await store.regenerate(userId, profile)).toBe(true)
+    // The reply is replaced, not appended: still one user + one assistant.
+    expect(store.state.messages).toHaveLength(2)
+    expect(store.state.messages[0]!.id).toBe(userId)
+    expect(store.state.messages[1]).toMatchObject({ content: 'second', status: 'complete' })
+
+    // The regenerated request re-sent the original question, not a blank turn.
+    const lastPrompt = requests[requests.length - 1]!.messages
+    expect(lastPrompt[lastPrompt.length - 1]).toMatchObject({ role: 'user' })
+    expect(JSON.stringify(lastPrompt)).toContain('Question')
+  })
+
+  it('ignores regenerate for an unknown or non-user message id', async () => {
+    const adapter: AgentAdapter = {
+      testConnection: vi.fn(),
+      async *stream(): AsyncIterable<AgentStreamEvent> {
+        yield { type: 'content-delta', text: 'reply' }
+        yield { type: 'completed' }
+      },
+    }
+    const store = createChatStore({
+      adapter,
+      loadApiKey: vi.fn(async () => 'secret-value'),
+      persist: vi.fn(async () => undefined),
+      createId: sequentialIds(),
+      now: () => 10,
+    })
+
+    expect(await store.send('Question', profile, [])).toBe(true)
+    const assistantId = store.state.messages[1]!.id
+    // Regenerating an assistant id (not a user turn) or a missing id is a no-op.
+    expect(await store.regenerate(assistantId, profile)).toBe(false)
+    expect(await store.regenerate('does-not-exist', profile)).toBe(false)
+    expect(store.state.messages).toHaveLength(2)
+  })
 })
 
 function retryableError(): AgentStreamEvent {

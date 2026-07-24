@@ -284,6 +284,11 @@ async function retryLast(): Promise<void> {
   await chatStore.retry(profileStore.profile.value)
 }
 
+async function regenerateMessage(messageId: string): Promise<void> {
+  startFollowingOutput()
+  await chatStore.regenerate(messageId, profileStore.profile.value, historyWindow.value)
+}
+
 async function updateHistoryWindow(value: number): Promise<void> {
   const clamped = clampHistoryWindow(value)
   historyWindow.value = clamped
@@ -453,7 +458,7 @@ onBeforeUnmount(() => {
         <div class="header-actions">
           <button
             type="button"
-            class="icon-button"
+            class="icon-button icon-button--danger"
             aria-label="Clear conversation"
             title="Clear conversation"
             :disabled="restoring || (!chatStore.state.messages.length && !chatStore.active.value)"
@@ -475,7 +480,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="icon-button"
+            class="icon-button icon-button--accent"
             aria-label="Open Agent settings"
             title="Settings"
             @click="settingsVisible = true"
@@ -540,7 +545,9 @@ onBeforeUnmount(() => {
           :key="message.id"
           :message="message"
           :can-retry="chatStore.state.canRetry && index === chatStore.state.messages.length - 1"
+          :busy="chatStore.active.value"
           @retry="retryLast"
+          @regenerate="regenerateMessage(message.id)"
         />
       </section>
 
@@ -571,6 +578,8 @@ onBeforeUnmount(() => {
   --accent: #15705f;
   --accent-soft: #dff3ed;
   --accent-contrast: #ffffff;
+  --context-selection: #536dcc;
+  --context-page: #c1772d;
   --warning: #8b5b00;
   --warning-soft: #fff1cf;
   --danger: #a43d39;
@@ -598,6 +607,8 @@ onBeforeUnmount(() => {
     --accent: #63cbb3;
     --accent-soft: #183e35;
     --accent-contrast: #10221d;
+    --context-selection: #8fa2ef;
+    --context-page: #e0954f;
     --warning: #f1bf5c;
     --warning-soft: #3f3218;
     --danger: #f08f89;
@@ -698,6 +709,26 @@ summary:focus-visible {
   display: grid;
   place-items: center;
   padding: 0.35rem;
+}
+
+.app-header .icon-button--accent {
+  color: var(--accent);
+}
+
+.app-header .icon-button--danger {
+  color: var(--danger);
+}
+
+.app-header .icon-button--accent:hover:not(:disabled),
+.app-header .icon-button--accent:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.app-header .icon-button--danger:hover:not(:disabled),
+.app-header .icon-button--danger:focus-visible {
+  border-color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .banner {

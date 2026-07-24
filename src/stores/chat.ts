@@ -175,6 +175,83 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
   }
 
   /**
+   * Regenerate the answer for an existing user message: rebuild the prompt from
+   * the history before it plus that question's own text/images/context, then
+   * replace the assistant reply that follows it with a freshly streamed one.
+   */
+  async function regenerate(
+    messageId: string,
+    profile: AgentProfile | null,
+    historyWindow: number = Number.POSITIVE_INFINITY,
+  ): Promise<boolean> {
+    if (active.value) return false
+    const userIndex = state.messages.findIndex(
+      (message) => message.id === messageId && message.role === 'user',
+    )
+    if (userIndex === -1) return false
+    if (!profile) {
+      state.error = 'Configure an agent before sending a message.'
+      state.phase = 'failed'
+      return false
+    }
+
+    const generation = ++requestGeneration
+    state.phase = 'validating'
+    state.error = null
+    state.canRetry = false
+    lastPrompt = null
+    const apiKey = await dependencies.loadApiKey(profile)
+    if (generation !== requestGeneration) return false
+    if (!apiKey) {
+      state.error = 'Enter an API key in Agent settings.'
+      state.phase = 'failed'
+      return false
+    }
+
+    const userMessage = state.messages[userIndex]
+    if (!userMessage) return false
+
+    const priorComplete = state.messages
+      .slice(0, userIndex)
+      .filter((message) => message.status === 'complete')
+    const history = limitHistoryByRounds(priorComplete, historyWindow)
+    const limitedContextItems = applyTotalContextLimit(
+      userMessage.contextItems ?? [],
+      profile.maxTotalContextChars,
+    )
+    const attachedImages = (userMessage.images ?? []).filter((url) => url.trim().length > 0)
+    const messages = buildPromptMessages({
+      contextItems: limitedContextItems,
+      history,
+      latestQuestion: userMessage.content,
+      ...(attachedImages.length ? { latestImages: attachedImages } : {}),
+      ...(profile.systemPrompt ? { systemPrompt: profile.systemPrompt } : {}),
+    })
+
+    const assistantMessage: ChatMessage = {
+      id: dependencies.createId(),
+      role: 'assistant',
+      content: '',
+      createdAt: dependencies.now(),
+      status: 'streaming',
+    }
+    const following = state.messages[userIndex + 1]
+    if (following && following.role === 'assistant') {
+      state.messages.splice(userIndex + 1, 1, assistantMessage)
+    } else {
+      state.messages.splice(userIndex + 1, 0, assistantMessage)
+    }
+    const assistantIndex = userIndex + 1
+    lastPrompt = messages
+    await persist()
+    if (generation !== requestGeneration) return false
+
+    const result = await streamRequest(assistantIndex, { profile, apiKey, messages }, generation)
+    if (generation === requestGeneration && result !== 'error') lastPrompt = null
+    return result === 'ok'
+  }
+
+  /**
    * Stream one request into the assistant message at `assistantIndex`, retrying
    * retryable failures up to MAX_ATTEMPTS. Each attempt starts from empty text.
    */
@@ -295,6 +372,7 @@ export function createChatStore(dependencies: ChatStoreDependencies) {
     hydrate,
     send,
     retry,
+    regenerate,
     cancel,
     clear,
   }

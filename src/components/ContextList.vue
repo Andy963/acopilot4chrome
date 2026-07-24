@@ -228,11 +228,11 @@ button:disabled {
 }
 
 .capture-button--selection {
-  --capture-color: #536dcc;
+  --capture-color: var(--context-selection);
 }
 
 .capture-button--page {
-  --capture-color: #c1772d;
+  --capture-color: var(--context-page);
 }
 
 .capture-button:hover:not(:disabled),

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-v-html -- renderMarkdown disables raw HTML and validates links. */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import 'katex/dist/katex.min.css'
 
 import { renderMarkdown } from '../context/markdown'
@@ -9,13 +9,39 @@ import type { ChatMessage } from '../context/types'
 const props = defineProps<{
   message: ChatMessage
   canRetry?: boolean
+  busy?: boolean
 }>()
 
 defineEmits<{
   retry: []
+  regenerate: []
 }>()
 
 const renderedContent = computed(() => renderMarkdown(props.message.content))
+
+type MessageCopyState = 'idle' | 'copied' | 'failed'
+const messageCopyState = ref<MessageCopyState>('idle')
+let messageCopyTimer: number | undefined
+
+const copyLabel = computed(() => {
+  if (messageCopyState.value === 'copied') return 'Copied'
+  if (messageCopyState.value === 'failed') return 'Copy failed'
+  return 'Copy'
+})
+
+async function copyMessage(): Promise<void> {
+  try {
+    // Assistant replies copy their raw Markdown source, not the rendered HTML.
+    await navigator.clipboard.writeText(props.message.content)
+    messageCopyState.value = 'copied'
+  } catch {
+    messageCopyState.value = 'failed'
+  }
+  if (messageCopyTimer) window.clearTimeout(messageCopyTimer)
+  messageCopyTimer = window.setTimeout(() => {
+    messageCopyState.value = 'idle'
+  }, 1200)
+}
 
 const COPY_BUTTON_ICONS = {
   copy: '<rect x="9" y="9" width="10" height="10" rx="1.5"/><path d="M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9"/>',
@@ -77,7 +103,43 @@ async function copyCode(event: MouseEvent): Promise<void> {
       <li v-for="item in message.contextItems" :key="item.id">
         <details>
           <summary>
-            <span class="context-kind">{{ item.kind === 'page' ? 'Page' : 'Selection' }}</span>
+            <span
+              class="context-kind"
+              :class="`context-kind--${item.kind}`"
+              :title="item.kind === 'page' ? 'Page context' : 'Selection context'"
+            >
+              <svg
+                v-if="item.kind === 'page'"
+                class="kind-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                role="img"
+                aria-label="Page"
+              >
+                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                <path d="M16 13H8M16 17H8M10 9H8" />
+              </svg>
+              <svg
+                v-else
+                class="kind-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                role="img"
+                aria-label="Selection"
+              >
+                <rect x="3" y="4.5" width="18" height="15" rx="2" stroke-dasharray="3 2.4" />
+                <path d="M7 10h10M7 14h6" />
+              </svg>
+            </span>
             <span class="context-title">{{ item.title || item.url || 'Context' }}</span>
             <span v-if="item.truncated" class="context-truncated">truncated</span>
           </summary>
@@ -124,6 +186,68 @@ async function copyCode(event: MouseEvent): Promise<void> {
         </button>
       </div>
     </template>
+
+    <footer
+      v-if="message.role === 'user' || (message.status === 'complete' && !!message.content)"
+      class="message-actions"
+    >
+      <button
+        type="button"
+        class="msg-action"
+        :class="{
+          'is-done': messageCopyState === 'copied',
+          'is-failed': messageCopyState === 'failed',
+        }"
+        :aria-label="copyLabel"
+        :title="copyLabel"
+        @click="copyMessage"
+      >
+        <svg
+          class="action-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path v-if="messageCopyState === 'copied'" d="m5 12 4 4L19 6" />
+          <path v-else-if="messageCopyState === 'failed'" d="m7 7 10 10M17 7 7 17" />
+          <template v-else>
+            <rect x="9" y="9" width="10" height="10" rx="1.5" />
+            <path
+              d="M15 9V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H9"
+            />
+          </template>
+        </svg>
+      </button>
+      <button
+        v-if="message.role === 'user'"
+        type="button"
+        class="msg-action msg-action--regen"
+        :disabled="busy"
+        aria-label="Regenerate response"
+        title="Regenerate response"
+        @click="$emit('regenerate')"
+      >
+        <svg
+          class="action-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          <path d="M3 21v-5h5" />
+        </svg>
+      </button>
+    </footer>
   </article>
 </template>
 
@@ -173,19 +297,29 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 .message-context summary {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.5rem;
   cursor: pointer;
 }
 
 .context-kind {
+  display: inline-flex;
   flex: none;
-  color: var(--accent);
-  font-size: 0.62rem;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  align-items: center;
+}
+
+.context-kind--page {
+  color: var(--context-page);
+}
+
+.context-kind--selection {
+  color: var(--context-selection);
+}
+
+.kind-icon {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .context-title {
@@ -306,6 +440,58 @@ async function copyCode(event: MouseEvent): Promise<void> {
   border-color: var(--accent);
 }
 
+.message-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+}
+
+.message--user .message-actions {
+  justify-content: flex-end;
+}
+
+.msg-action {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.msg-action:hover:not(:disabled),
+.msg-action:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
+  background: var(--accent-soft);
+}
+
+.msg-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.msg-action.is-done {
+  color: var(--success);
+}
+
+.msg-action.is-failed {
+  color: var(--danger);
+}
+
+.action-icon {
+  display: block;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 .plain-content {
   margin: 0;
   line-height: 1.55;
@@ -337,6 +523,13 @@ async function copyCode(event: MouseEvent): Promise<void> {
   color: var(--code-text);
 }
 
+/* The .code-block wrapper carries the block's vertical rhythm so the edge
+   margin reset above (which now targets the wrapper) keeps working; the inner
+   <pre>'s UA margin is neutralized to avoid collapsing through the wrapper. */
+.markdown-content :deep(.code-block pre) {
+  margin: 0;
+}
+
 .markdown-content :deep(pre code) {
   font-family: var(--font-mono);
   font-size: 0.76rem;
@@ -344,6 +537,7 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 .markdown-content :deep(.code-block) {
   position: relative;
+  margin: 0.75rem 0;
 }
 
 .markdown-content :deep(.copy-code) {
@@ -363,6 +557,23 @@ async function copyCode(event: MouseEvent): Promise<void> {
   cursor: pointer;
   font: inherit;
   font-size: 0;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.markdown-content :deep(.code-block:hover .copy-code),
+.markdown-content :deep(.code-block:focus-within .copy-code),
+.markdown-content :deep(.copy-code:focus-visible) {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-content :deep(.copy-code) {
+    transition: none;
+  }
 }
 
 .markdown-content :deep(.copy-code:hover),
