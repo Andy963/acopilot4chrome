@@ -61,6 +61,7 @@ const sourceUrl = computed(() => {
           <path d="M7 10h10M7 14h6" />
         </svg>
       </span>
+      <h3 :title="item.title">{{ item.title || 'Untitled page' }}</h3>
       <button
         class="icon-button"
         type="button"
@@ -71,7 +72,6 @@ const sourceUrl = computed(() => {
       </button>
     </header>
 
-    <h3 :title="item.title">{{ item.title || 'Untitled page' }}</h3>
     <a
       v-if="sourceUrl"
       class="source"
@@ -94,7 +94,7 @@ const sourceUrl = computed(() => {
 <style scoped>
 .context-card {
   min-width: 14rem;
-  padding: 0.65rem 0.7rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--surface-raised);
@@ -103,12 +103,12 @@ const sourceUrl = computed(() => {
 header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .kind {
   display: inline-flex;
+  flex: none;
   align-items: center;
 }
 
@@ -126,14 +126,15 @@ header {
 }
 
 .icon-button {
-  width: 1.6rem;
-  height: 1.6rem;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
 }
 
 .icon-button:hover,
@@ -143,9 +144,11 @@ header {
 }
 
 h3 {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  margin: 0.35rem 0 0.15rem;
-  font-size: 0.88rem;
+  margin: 0;
+  font-size: 0.85rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

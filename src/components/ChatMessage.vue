@@ -101,7 +101,7 @@ async function copyCode(event: MouseEvent): Promise<void> {
       aria-label="Context sent with this message"
     >
       <li v-for="item in message.contextItems" :key="item.id">
-        <details>
+        <details class="context-quote" :class="`context-quote--${item.kind}`">
           <summary>
             <span
               class="context-kind"
@@ -260,6 +260,12 @@ async function copyCode(event: MouseEvent): Promise<void> {
   background: var(--surface-raised);
 }
 
+/* When a message shows the copy/regenerate footer, tuck it closer to the
+   bottom edge so the actions sit at the bottom-left of the bubble. */
+.message:has(.message-actions) {
+  padding-bottom: 0.4rem;
+}
+
 .message--user {
   align-self: end;
   border-bottom-right-radius: 0.25rem;
@@ -290,9 +296,18 @@ async function copyCode(event: MouseEvent): Promise<void> {
 }
 
 .message-context details {
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--surface);
+  border: none;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+.message-context .context-quote--page {
+  border-left-color: var(--context-page);
+}
+
+.message-context .context-quote--selection {
+  border-left-color: var(--context-selection);
 }
 
 .message-context summary {
@@ -342,8 +357,8 @@ async function copyCode(event: MouseEvent): Promise<void> {
   overflow: auto;
   max-height: 10rem;
   margin: 0;
-  padding: 0.5rem;
-  border-top: 1px solid var(--border);
+  padding: 0.15rem 0.5rem 0.35rem;
+  color: var(--muted);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.5;
@@ -443,11 +458,7 @@ async function copyCode(event: MouseEvent): Promise<void> {
 .message-actions {
   display: flex;
   gap: 0.25rem;
-  margin-top: 0.45rem;
-}
-
-.message--user .message-actions {
-  justify-content: flex-end;
+  margin-top: 0.2rem;
 }
 
 .msg-action {
@@ -547,12 +558,11 @@ async function copyCode(event: MouseEvent): Promise<void> {
   z-index: 1;
   top: 0.35rem;
   right: 0.4rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.35rem;
-  padding: 0.25rem;
-  background: var(--surface-raised);
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  padding: 0.2rem;
+  background: transparent;
   color: var(--muted);
   cursor: pointer;
   font: inherit;
@@ -560,8 +570,7 @@ async function copyCode(event: MouseEvent): Promise<void> {
   opacity: 0;
   transition:
     opacity 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
+    color 120ms ease;
 }
 
 .markdown-content :deep(.code-block:hover .copy-code),
@@ -578,17 +587,14 @@ async function copyCode(event: MouseEvent): Promise<void> {
 
 .markdown-content :deep(.copy-code:hover),
 .markdown-content :deep(.copy-code:focus-visible) {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
 .markdown-content :deep(.copy-code[data-copy-state='copied']) {
-  border-color: var(--success);
   color: var(--success);
 }
 
 .markdown-content :deep(.copy-code[data-copy-state='failed']) {
-  border-color: var(--danger);
   color: var(--danger);
 }
 

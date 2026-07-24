@@ -256,14 +256,51 @@ function applyImported(source: Partial<AgentProfileDraft>): void {
         <div class="secret-field">
           <input
             v-model="apiKey"
+            class="secret-input"
             :type="showApiKey ? 'text' : 'password'"
             autocomplete="off"
             :placeholder="
               profile ? 'Leave blank to keep the saved key' : 'Required by your endpoint'
             "
           />
-          <button type="button" @click="showApiKey = !showApiKey">
-            {{ showApiKey ? 'Hide' : 'Show' }}
+          <button
+            type="button"
+            class="eye-toggle"
+            :class="{ 'is-visible': showApiKey }"
+            :aria-label="showApiKey ? 'Hide API key' : 'Show API key'"
+            :title="showApiKey ? 'Hide API key' : 'Show API key'"
+            @click="showApiKey = !showApiKey"
+          >
+            <svg
+              v-if="showApiKey"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+              <path
+                d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
+              />
+              <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+              <line x1="2" x2="22" y1="2" y2="22" />
+            </svg>
+            <svg
+              v-else
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </button>
         </div>
       </label>
@@ -397,7 +434,6 @@ function applyImported(source: Partial<AgentProfileDraft>): void {
 
 header,
 .form-actions,
-.secret-field,
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -538,11 +574,48 @@ textarea:focus {
 }
 
 .secret-field {
-  gap: 0.4rem;
+  position: relative;
 }
 
-.secret-field button {
-  flex: none;
+.secret-input {
+  padding-right: 2.5rem;
+}
+
+.eye-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease;
+}
+
+.secret-field:hover .eye-toggle,
+.secret-field:focus-within .eye-toggle,
+.eye-toggle.is-visible,
+.eye-toggle:focus-visible {
+  opacity: 1;
+}
+
+.eye-toggle:hover {
+  color: var(--accent);
+}
+
+.eye-toggle svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .checkbox-row {
