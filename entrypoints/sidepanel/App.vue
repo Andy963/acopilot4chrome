@@ -55,6 +55,7 @@ const appError = ref<string | null>(null)
 const messageList = ref<HTMLElement>()
 const syncEnabled = ref(false)
 const historyWindow = ref(DEFAULT_HISTORY_WINDOW)
+const hiddenUrlPatterns = ref<readonly string[]>([])
 const followingOutput = ref(true)
 
 let sessionId = createId()
@@ -164,6 +165,7 @@ async function restore(): Promise<void> {
   try {
     syncEnabled.value = await preferences.getSyncEnabled()
     historyWindow.value = await preferences.getHistoryWindow()
+    hiddenUrlPatterns.value = await preferences.getHiddenUrlPatterns()
     await profileStore.restore()
     const session = await sessions.loadActiveSession()
     const activeProfileId = profileStore.profile.value?.id
@@ -287,6 +289,18 @@ async function retryLast(): Promise<void> {
 async function regenerateMessage(messageId: string): Promise<void> {
   startFollowingOutput()
   await chatStore.regenerate(messageId, profileStore.profile.value, historyWindow.value)
+}
+
+async function updateHiddenUrlPatterns(patterns: readonly string[]): Promise<void> {
+  const previous = hiddenUrlPatterns.value
+  hiddenUrlPatterns.value = patterns
+  try {
+    await preferences.setHiddenUrlPatterns(patterns)
+    hiddenUrlPatterns.value = await preferences.getHiddenUrlPatterns()
+  } catch (error) {
+    hiddenUrlPatterns.value = previous
+    appError.value = safeErrorMessage(error, 'Unable to save the hidden URL patterns.')
+  }
 }
 
 async function updateHistoryWindow(value: number): Promise<void> {
@@ -442,11 +456,13 @@ onBeforeUnmount(() => {
       :connection-status="profileStore.state.connectionStatus"
       :connection-message="profileStore.state.connectionMessage ?? undefined"
       :sync-enabled="syncEnabled"
+      :hidden-url-patterns="hiddenUrlPatterns"
       @close="profileStore.profile.value && (settingsVisible = false)"
       @delete="deleteProfile"
       @save="saveSettings"
       @test="profileStore.test"
       @toggle-sync="setSync"
+      @update-hidden-url-patterns="updateHiddenUrlPatterns"
     />
 
     <template v-else>

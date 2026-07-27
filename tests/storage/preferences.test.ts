@@ -30,4 +30,24 @@ describe('PreferencesRepository', () => {
     await prefs.setHistoryWindow(999)
     expect(await prefs.getHistoryWindow()).toBe(50)
   })
+
+  it('defaults hidden URL patterns to empty and normalizes what it stores', async () => {
+    const prefs = new PreferencesRepository(new MemoryStorage())
+
+    expect(await prefs.getHiddenUrlPatterns()).toEqual([])
+
+    await prefs.setHiddenUrlPatterns(['  ^https://a\\.com/  ', '', '^https://a\\.com/', '^b\\.net'])
+    expect(await prefs.getHiddenUrlPatterns()).toEqual(['^https://a\\.com/', '^b\\.net'])
+  })
+
+  it('ignores hidden URL patterns stored in an unexpected shape', async () => {
+    const storage = new MemoryStorage()
+    const prefs = new PreferencesRepository(storage)
+
+    await storage.set({ hiddenUrlPatterns: 'example\\.com' })
+    expect(await prefs.getHiddenUrlPatterns()).toEqual([])
+
+    await storage.set({ hiddenUrlPatterns: ['a\\.com', 7, null] })
+    expect(await prefs.getHiddenUrlPatterns()).toEqual(['a\\.com'])
+  })
 })

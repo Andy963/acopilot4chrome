@@ -1,7 +1,9 @@
+import { MAX_URL_PATTERNS } from '../permissions/url-blocklist'
 import type { StorageArea } from './storage-area'
 
 export const SYNC_ENABLED_STORAGE_KEY = 'syncSettingsEnabled'
 export const HISTORY_WINDOW_STORAGE_KEY = 'historyWindowTurns'
+export const HIDDEN_URL_PATTERNS_STORAGE_KEY = 'hiddenUrlPatterns'
 
 export const DEFAULT_HISTORY_WINDOW = 4
 export const MIN_HISTORY_WINDOW = 1
@@ -37,4 +39,30 @@ export class PreferencesRepository {
   async setHistoryWindow(turns: number): Promise<void> {
     await this.localStorage.set({ [HISTORY_WINDOW_STORAGE_KEY]: clampHistoryWindow(turns) })
   }
+
+  async getHiddenUrlPatterns(): Promise<string[]> {
+    const values = await this.localStorage.get(HIDDEN_URL_PATTERNS_STORAGE_KEY)
+    return sanitizeUrlPatterns(values[HIDDEN_URL_PATTERNS_STORAGE_KEY])
+  }
+
+  async setHiddenUrlPatterns(patterns: readonly string[]): Promise<void> {
+    await this.localStorage.set({
+      [HIDDEN_URL_PATTERNS_STORAGE_KEY]: sanitizeUrlPatterns(patterns),
+    })
+  }
+}
+
+function sanitizeUrlPatterns(stored: unknown): string[] {
+  if (!Array.isArray(stored)) return []
+  const seen = new Set<string>()
+  const patterns: string[] = []
+  for (const entry of stored) {
+    if (typeof entry !== 'string') continue
+    const pattern = entry.trim()
+    if (pattern === '' || seen.has(pattern)) continue
+    seen.add(pattern)
+    patterns.push(pattern)
+    if (patterns.length === MAX_URL_PATTERNS) break
+  }
+  return patterns
 }

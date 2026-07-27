@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import type { AgentProfile } from '../agent/adapter'
+import {
+  compileUrlBlocklist,
+  formatUrlPatternInput,
+  parseUrlPatternInput,
+} from '../permissions/url-blocklist'
 import type { AgentProfileDraft, AgentSettingsSubmission } from '../stores/profiles'
 
 const props = defineProps<{
@@ -10,6 +15,7 @@ const props = defineProps<{
   connectionStatus: 'idle' | 'success' | 'error'
   connectionMessage: string | undefined
   syncEnabled: boolean
+  hiddenUrlPatterns: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +24,7 @@ const emit = defineEmits<{
   save: [submission: AgentSettingsSubmission]
   test: [submission: AgentSettingsSubmission]
   toggleSync: [enabled: boolean]
+  updateHiddenUrlPatterns: [patterns: string[]]
 }>()
 
 function initialDraft(profile: AgentProfile | null): AgentProfileDraft {
@@ -63,6 +70,24 @@ watch(
     modelRows.value = initialModelRows(profile)
   },
 )
+
+const hiddenUrlPatternInput = ref(formatUrlPatternInput(props.hiddenUrlPatterns))
+
+watch(
+  () => props.hiddenUrlPatterns,
+  (patterns) => {
+    if (parseUrlPatternInput(hiddenUrlPatternInput.value).join('\n') === patterns.join('\n')) return
+    hiddenUrlPatternInput.value = formatUrlPatternInput(patterns)
+  },
+)
+
+const invalidHiddenUrlPatterns = computed(
+  () => compileUrlBlocklist(parseUrlPatternInput(hiddenUrlPatternInput.value)).invalidPatterns,
+)
+
+function commitHiddenUrlPatterns(): void {
+  emit('updateHiddenUrlPatterns', parseUrlPatternInput(hiddenUrlPatternInput.value))
+}
 
 function addModel(): void {
   modelRows.value.push({ name: '', vision: false })
@@ -381,10 +406,30 @@ function applyImported(source: Partial<AgentProfileDraft>): void {
             <span>Maximum total context characters</span>
             <input v-model.number="draft.maxTotalContextChars" type="number" min="1000" required />
           </label>
-          <label>
+          <label class="full-width">
             <span>System instruction <small>optional</small></span>
             <textarea v-model="draft.systemPrompt" rows="8" />
           </label>
+          <label class="full-width">
+            <span>Hide the panel on these URLs <small>one regular expression per line</small></span>
+            <textarea
+              v-model="hiddenUrlPatternInput"
+              rows="4"
+              spellcheck="false"
+              placeholder="^https://mail\.google\.com/&#10;^https?://([^/]+\.)?example\.com/"
+              @change="commitHiddenUrlPatterns"
+              @blur="commitHiddenUrlPatterns"
+            />
+          </label>
+          <p class="test-note full-width">
+            Matching is case-insensitive and unanchored, so <code>example\.com</code> hides every
+            page on that host. Chrome closes the panel on a matching tab; reopen it from the toolbar
+            after leaving that page.
+          </p>
+          <p v-if="invalidHiddenUrlPatterns.length" class="storage-warning full-width" role="alert">
+            Ignored invalid pattern{{ invalidHiddenUrlPatterns.length > 1 ? 's' : '' }}:
+            {{ invalidHiddenUrlPatterns.join(', ') }}
+          </p>
         </div>
       </details>
 
@@ -718,12 +763,17 @@ button:disabled {
   color: var(--danger);
 }
 
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+}
+
 @media (min-width: 34rem) {
   .advanced-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .advanced-grid label:last-child {
+  .advanced-grid > .full-width {
     grid-column: 1 / -1;
   }
 }
