@@ -491,7 +491,9 @@ onBeforeUnmount(() => {
               stroke-linejoin="round"
               aria-hidden="true"
             >
-              <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6" />
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="m14.5 8.5-5 5" />
+              <path d="m9.5 8.5 5 5" />
             </svg>
           </button>
           <button
@@ -604,6 +606,17 @@ onBeforeUnmount(() => {
   --success-soft: #e1f3e8;
   --code-bg: #18201d;
   --code-text: #eef7f2;
+  /* Code blocks keep the dark background in both color schemes, so the syntax
+     palette is defined once instead of per scheme. */
+  --code-comment: #8a978f;
+  --code-keyword: #ef9ab8;
+  --code-string: #a9dd8b;
+  --code-number: #f4c485;
+  --code-function: #8ec7f2;
+  --code-type: #6fd9bd;
+  --code-variable: #c9b8f5;
+  --code-deleted: #f08f89;
+  --code-added: #79d69e;
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;

@@ -440,6 +440,15 @@ describe('renderMarkdown safety and screenshot regressions', () => {
     expect(html).not.toContain('<img src=x')
   })
 
+  it('keeps highlight.js token classes on the sanitized code block', () => {
+    const el = renderToElement(renderMarkdown('```js\nconst answer = "42" // note\n```'))
+
+    expect(el.querySelectorAll('pre code .hljs-keyword').length).toBeGreaterThan(0)
+    expect(el.querySelectorAll('pre code .hljs-string').length).toBeGreaterThan(0)
+    expect(el.querySelectorAll('pre code .hljs-comment').length).toBeGreaterThan(0)
+    expect(el.querySelector('pre code')?.textContent).toBe('const answer = "42" // note')
+  })
+
   it('opens safe links in a new tab and rejects dangerous schemes', () => {
     const safe = renderMarkdown('[site](https://example.com)')
     expect(safe).toContain('target="_blank"')

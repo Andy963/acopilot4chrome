@@ -244,9 +244,68 @@ function applyImported(source: Partial<AgentProfileDraft>): void {
         <h2 id="settings-heading">Agent settings</h2>
       </div>
       <div class="header-actions">
-        <button class="text-button" type="button" @click="triggerImport">Import</button>
-        <button class="text-button" type="button" @click="exportSettings">Export</button>
-        <button class="text-button" type="button" @click="$emit('close')">Close</button>
+        <button
+          class="header-icon-button"
+          type="button"
+          aria-label="Import settings"
+          title="Import settings"
+          @click="triggerImport"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="m17 8-5-5-5 5" />
+            <path d="M12 3v12" />
+          </svg>
+        </button>
+        <button
+          class="header-icon-button"
+          type="button"
+          aria-label="Export settings"
+          title="Export settings"
+          @click="exportSettings"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M12 15V3" />
+          </svg>
+        </button>
+        <button
+          class="header-icon-button"
+          type="button"
+          aria-label="Close settings"
+          title="Close settings"
+          @click="$emit('close')"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
       </div>
       <input
         ref="importInput"
@@ -750,6 +809,29 @@ button:disabled {
 .text-button {
   border-color: transparent;
   background: transparent;
+}
+
+.header-icon-button {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.header-icon-button:hover,
+.header-icon-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.header-icon-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .primary-button {

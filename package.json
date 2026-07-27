@@ -1,6 +1,6 @@
 {
   "name": "acopilot4chrome",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Chrome side-panel AI copilot for any OpenAI-compatible endpoint — bring your own key, chat with page context",
   "private": true,
   "type": "module",

@@ -546,6 +546,84 @@ async function copyCode(event: MouseEvent): Promise<void> {
   font-size: 0.76rem;
 }
 
+/* highlight.js emits class-only markup, so the token palette lives here rather
+   than pulling in one of its stylesheets (which would hard-code its own
+   background and fight the surrounding theme). */
+.markdown-content :deep(.hljs-comment),
+.markdown-content :deep(.hljs-quote) {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.markdown-content :deep(.hljs-keyword),
+.markdown-content :deep(.hljs-selector-tag),
+.markdown-content :deep(.hljs-literal),
+.markdown-content :deep(.hljs-doctag),
+.markdown-content :deep(.hljs-meta .hljs-keyword),
+.markdown-content :deep(.hljs-tag) {
+  color: var(--code-keyword);
+}
+
+.markdown-content :deep(.hljs-string),
+.markdown-content :deep(.hljs-regexp),
+.markdown-content :deep(.hljs-char.escape_),
+.markdown-content :deep(.hljs-meta .hljs-string),
+.markdown-content :deep(.hljs-template-variable),
+.markdown-content :deep(.hljs-subst) {
+  color: var(--code-string);
+}
+
+.markdown-content :deep(.hljs-number),
+.markdown-content :deep(.hljs-symbol),
+.markdown-content :deep(.hljs-bullet),
+.markdown-content :deep(.hljs-meta),
+.markdown-content :deep(.hljs-link) {
+  color: var(--code-number);
+}
+
+.markdown-content :deep(.hljs-title),
+.markdown-content :deep(.hljs-title.function_),
+.markdown-content :deep(.hljs-section),
+.markdown-content :deep(.hljs-selector-id),
+.markdown-content :deep(.hljs-selector-class),
+.markdown-content :deep(.hljs-selector-pseudo) {
+  color: var(--code-function);
+}
+
+.markdown-content :deep(.hljs-title.class_),
+.markdown-content :deep(.hljs-type),
+.markdown-content :deep(.hljs-built_in),
+.markdown-content :deep(.hljs-class .hljs-title),
+.markdown-content :deep(.hljs-params) {
+  color: var(--code-type);
+}
+
+.markdown-content :deep(.hljs-attr),
+.markdown-content :deep(.hljs-attribute),
+.markdown-content :deep(.hljs-variable),
+.markdown-content :deep(.hljs-property),
+.markdown-content :deep(.hljs-name),
+.markdown-content :deep(.hljs-operator) {
+  color: var(--code-variable);
+}
+
+.markdown-content :deep(.hljs-deletion) {
+  color: var(--code-deleted);
+}
+
+.markdown-content :deep(.hljs-addition) {
+  color: var(--code-added);
+}
+
+.markdown-content :deep(.hljs-emphasis) {
+  font-style: italic;
+}
+
+.markdown-content :deep(.hljs-strong),
+.markdown-content :deep(.hljs-section) {
+  font-weight: 700;
+}
+
 .markdown-content :deep(.code-block) {
   position: relative;
   margin: 0.75rem 0;

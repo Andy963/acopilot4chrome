@@ -12,6 +12,7 @@ Acopilot4chrome is a Chrome 116+ side-panel extension that sends only user-selec
 - Set a **Context window** on the Page context row to control how many of your recent messages and their replies are resent as history (default 4 turns; older turns are omitted from the request).
 - Configure an OpenAI-compatible base URL, API key, and one or more model names (switch the active model from the composer toolbar). Mark a model as **Vision** to enable image input for it. Requests use `Authorization: Bearer <key>` and the standard `chat/completions` path automatically.
 - Export and import your agent settings as a JSON file (the API key is never included).
+- Hide the side panel on chosen sites: add regular expressions under **Advanced settings → Hide the panel on these URLs** (one per line) and Chrome disables the panel on any tab whose URL matches.
 - Attach images to a question when the active model is vision-capable — paste them into the composer (including "Copy image" from a page) or use the attach button. They are sent as `image_url` parts alongside your text.
 - Stream Markdown responses with tolerant LaTeX math rendering (`$…$`, `$$…$$`, `\(...\)`, and `\[...\]`), including recovery for common model-generated delimiter and command-boundary errors; cancel active requests, and restore the active browser-session conversation.
 - Failed requests retry automatically up to 3 times; if they still fail, a **Retry** button re-runs the request and a successful retry removes the failed reply.
