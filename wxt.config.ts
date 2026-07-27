@@ -45,6 +45,11 @@ export default defineConfig({
     '@': fileURLToPath(new URL('./src', import.meta.url)),
   },
   modules: ['@wxt-dev/module-vue'],
+  hooks: {
+    'build:manifestGenerated'(_wxt, manifest): void {
+      delete manifest.side_panel
+    },
+  },
   vite: () => ({
     plugins: [katexWoff2Only],
     build: {
@@ -62,9 +67,6 @@ export default defineConfig({
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: 'Open Acopilot4chrome',
-    },
-    side_panel: {
-      default_path: 'sidepanel.html',
     },
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'",

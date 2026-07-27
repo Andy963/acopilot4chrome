@@ -38,6 +38,10 @@ describe('validateUrlPattern', () => {
     expect(validateUrlPattern('^https://example\\.com/')).toBeNull()
   })
 
+  it('accepts slash-delimited regular expressions', () => {
+    expect(validateUrlPattern('/example\\.com/i')).toBeNull()
+  })
+
   it('rejects a malformed regular expression', () => {
     expect(validateUrlPattern('^https://(example')).toEqual(expect.any(String))
   })
@@ -63,6 +67,20 @@ describe('compileUrlBlocklist', () => {
     const blocklist = compileUrlBlocklist(['example\\.COM'])
 
     expect(isUrlBlocked('https://Example.com/', blocklist)).toBe(true)
+  })
+
+  it('matches slash-delimited patterns with optional flags', () => {
+    const blocklist = compileUrlBlocklist(['/mail\\.google\\.com/', '/example\\.com/g'])
+
+    expect(isUrlBlocked('https://mail.google.com/u/0/#inbox', blocklist)).toBe(true)
+    expect(isUrlBlocked('https://EXAMPLE.com/page', blocklist)).toBe(true)
+  })
+
+  it('allows escaped slashes inside slash-delimited patterns', () => {
+    const blocklist = compileUrlBlocklist(['/example\\.com\\/docs/'])
+
+    expect(isUrlBlocked('https://example.com/docs/page', blocklist)).toBe(true)
+    expect(isUrlBlocked('https://example.com/help/page', blocklist)).toBe(false)
   })
 })
 

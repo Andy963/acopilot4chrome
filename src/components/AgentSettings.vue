@@ -475,15 +475,15 @@ function applyImported(source: Partial<AgentProfileDraft>): void {
               v-model="hiddenUrlPatternInput"
               rows="4"
               spellcheck="false"
-              placeholder="^https://mail\.google\.com/&#10;^https?://([^/]+\.)?example\.com/"
+              placeholder="/mail\.google\.com/&#10;^https?://([^/]+\.)?example\.com/"
               @change="commitHiddenUrlPatterns"
               @blur="commitHiddenUrlPatterns"
             />
           </label>
           <p class="test-note full-width">
-            Matching is case-insensitive and unanchored, so <code>example\.com</code> hides every
-            page on that host. Chrome closes the panel on a matching tab; reopen it from the toolbar
-            after leaving that page.
+            Matching is case-insensitive and unanchored. Both <code>example\.com</code> and
+            <code>/example\.com/</code> hide every page on that host. Reopen the panel from the
+            toolbar after leaving a matching page.
           </p>
           <p v-if="invalidHiddenUrlPatterns.length" class="storage-warning full-width" role="alert">
             Ignored invalid pattern{{ invalidHiddenUrlPatterns.length > 1 ? 's' : '' }}:

@@ -18,9 +18,7 @@ export default defineBackground(() => {
   const sidePanelVisibility = new SidePanelVisibility({
     loadHiddenUrlPatterns: () => preferences.getHiddenUrlPatterns(),
     async setTabPanelEnabled(tabId, enabled) {
-      await chrome.sidePanel.setOptions(
-        enabled ? { tabId, path: SIDE_PANEL_PATH, enabled: true } : { tabId, enabled: false },
-      )
+      await chrome.sidePanel.setOptions({ tabId, path: SIDE_PANEL_PATH, enabled })
     },
     listTabs: () => chrome.tabs.query({}),
   })

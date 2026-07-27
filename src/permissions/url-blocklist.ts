@@ -35,7 +35,7 @@ export function validateUrlPattern(pattern: string): string | null {
   }
 
   try {
-    new RegExp(pattern, 'iu')
+    compileUrlPattern(pattern)
     return null
   } catch (error) {
     return error instanceof Error ? error.message : 'Not a valid regular expression.'
@@ -54,7 +54,7 @@ export function compileUrlBlocklist(patterns: readonly string[]): UrlBlocklist {
       invalidPatterns.push(pattern)
       continue
     }
-    matchers.push(new RegExp(pattern, 'iu'))
+    matchers.push(compileUrlPattern(pattern))
   }
   return { matchers, invalidPatterns }
 }
@@ -65,4 +65,39 @@ export function isUrlBlocked(url: string | undefined, blocklist: UrlBlocklist): 
     matcher.lastIndex = 0
     return matcher.test(url)
   })
+}
+
+function compileUrlPattern(pattern: string): RegExp {
+  const delimited = parseDelimitedRegex(pattern)
+  if (!delimited) return new RegExp(pattern, 'iu')
+  return new RegExp(delimited.source, normalizedFlags(delimited.flags))
+}
+
+function parseDelimitedRegex(pattern: string): { source: string; flags: string } | null {
+  if (!pattern.startsWith('/')) return null
+
+  for (let index = pattern.length - 1; index > 0; index -= 1) {
+    if (pattern[index] !== '/' || isEscaped(pattern, index)) continue
+    return {
+      source: pattern.slice(1, index),
+      flags: pattern.slice(index + 1),
+    }
+  }
+
+  return null
+}
+
+function isEscaped(value: string, index: number): boolean {
+  let backslashes = 0
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) {
+    backslashes += 1
+  }
+  return backslashes % 2 === 1
+}
+
+function normalizedFlags(flags: string): string {
+  const output = new Set(flags)
+  output.add('i')
+  if (!output.has('v')) output.add('u')
+  return [...output].join('')
 }
