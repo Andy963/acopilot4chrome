@@ -93,7 +93,7 @@ const sourceUrl = computed(() => {
 
 <style scoped>
 .context-card {
-  min-width: 14rem;
+  min-width: 0;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;

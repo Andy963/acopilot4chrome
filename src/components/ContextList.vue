@@ -291,10 +291,7 @@ button:disabled {
 
 .context-list {
   display: grid;
-  grid-auto-columns: minmax(14rem, 85%);
-  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.65rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
 }
 </style>
